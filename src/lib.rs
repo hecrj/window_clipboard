@@ -3,21 +3,7 @@ use std::cell::RefCell;
 use std::error::Error;
 
 pub struct Clipboard {
-    raw: Raw,
-}
-
-enum Raw {
-    #[cfg(all(
-        unix,
-        not(any(
-            target_os = "macos",
-            target_os = "android",
-            target_os = "emscripten"
-        ))
-    ))]
-    Wayland(RefCell<smithay_clipboard::WaylandClipboard>),
-
-    NotWayland(RefCell<clipboard::ClipboardContext>),
+    raw: RefCell<Box<dyn copypasta::ClipboardProvider>>,
 }
 
 impl Clipboard {
@@ -36,66 +22,32 @@ impl Clipboard {
             RawWindowHandle::Wayland(handle) => {
                 assert!(!handle.display.is_null());
 
-                Raw::Wayland(RefCell::new(unsafe {
-                    smithay_clipboard::WaylandClipboard::new_from_external(
+                Box::new(unsafe {
+                    let (_, raw) = copypasta::wayland_clipboard::create_clipboards_from_external(
                         handle.display as *mut _,
-                    )
-                }))
-            }
-            _ => {
-                use clipboard::ClipboardProvider as _;
+                    );
 
-                Raw::NotWayland(RefCell::new(
-                    clipboard::ClipboardContext::new()?
-                ))
+                    raw
+                }) as _
             }
+            _ => Box::new(copypasta::ClipboardContext::new()?) as _,
         };
 
-        Ok(Clipboard { raw })
+        Ok(Clipboard {
+            raw: RefCell::new(raw),
+        })
     }
 
     pub fn read(&self) -> Result<String, Box<dyn Error>> {
         // TODO: Think about use of `RefCell`
         // Maybe we should make `read` mutable (?)
-        use clipboard::ClipboardProvider as _;
-
-        match &self.raw {
-            #[cfg(all(
-                unix,
-                not(any(
-                    target_os = "macos",
-                    target_os = "android",
-                    target_os = "emscripten"
-                ))
-            ))]
-            Raw::Wayland(clipboard) => Ok(clipboard.borrow_mut().load(None)),
-            Raw::NotWayland(clipboard) => clipboard.borrow_mut().get_contents(),
-        }
+        self.raw.borrow_mut().get_contents()
     }
 
     pub fn write(
         &mut self,
         contents: impl Into<String>,
     ) -> Result<(), Box<dyn Error>> {
-        use clipboard::ClipboardProvider as _;
-
-        match &self.raw {
-            #[cfg(all(
-                unix,
-                not(any(
-                    target_os = "macos",
-                    target_os = "android",
-                    target_os = "emscripten"
-                ))
-            ))]
-            Raw::Wayland(clipboard) => {
-                clipboard.borrow_mut().store(None, contents);
-
-                Ok(())
-            }
-            Raw::NotWayland(clipboard) => {
-                clipboard.borrow_mut().set_contents(contents.into())
-            }
-        }
+        self.raw.borrow_mut().set_contents(contents.into())
     }
 }
