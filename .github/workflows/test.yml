@@ -11,6 +11,9 @@ jobs:
     - uses: hecrj/setup-rust-action@v1
       with:
         rust-version: ${{ matrix.rust }}
+    - name: Install xcb libraries
+      if: matrix.os == 'ubuntu-latest'
+      run: sudo apt-get install -y libxcb-shape0-dev libxcb-xfixes0-dev
     - uses: actions/checkout@master
     - name: Run tests
       run: cargo test --verbose
