@@ -60,6 +60,14 @@ impl Clipboard {
         use clipboard::ClipboardProvider as _;
 
         match &self.raw {
+            #[cfg(all(
+                unix,
+                not(any(
+                    target_os = "macos",
+                    target_os = "android",
+                    target_os = "emscripten"
+                ))
+            ))]
             Raw::Wayland(clipboard) => Ok(clipboard.borrow_mut().load(None)),
             Raw::NotWayland(clipboard) => clipboard.borrow_mut().get_contents(),
         }
@@ -72,6 +80,14 @@ impl Clipboard {
         use clipboard::ClipboardProvider as _;
 
         match &self.raw {
+            #[cfg(all(
+                unix,
+                not(any(
+                    target_os = "macos",
+                    target_os = "android",
+                    target_os = "emscripten"
+                ))
+            ))]
             Raw::Wayland(clipboard) => {
                 clipboard.borrow_mut().store(None, contents);
 
