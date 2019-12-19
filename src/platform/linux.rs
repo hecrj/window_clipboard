@@ -3,8 +3,8 @@ use crate::ClipboardProvider;
 use raw_window_handle::{HasRawWindowHandle, RawWindowHandle};
 use std::error::Error;
 
-pub use window_clipboard_wayland as wayland;
-pub use window_clipboard_x11 as x11;
+pub use clipboard_wayland as wayland;
+pub use clipboard_x11 as x11;
 
 pub fn new_clipboard<W: HasRawWindowHandle>(
     window: &W,

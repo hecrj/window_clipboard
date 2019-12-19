@@ -1,9 +1,13 @@
 [package]
-name = "window_clipboard_x11"
-version = "0.1.0"
+name = "clipboard_x11"
+version = "0.1.0-alpha"
 authors = ["Héctor Ramón Jiménez <hector0193@gmail.com>"]
 edition = "2018"
+description = "A library to obtain access to the X11 clipboard"
 license = "MIT"
+repository = "https://github.com/hecrj/window_clipboard"
+documentation = "https://docs.rs/clipboard_x11"
+keywords = ["clipboard", "x11"]
 
 [dependencies]
 xcb = { version = "0.9", features = ["thread"] }

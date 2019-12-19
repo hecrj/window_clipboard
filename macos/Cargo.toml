@@ -1,9 +1,16 @@
 [package]
-name = "window_clipboard_macos"
-version = "0.1.0"
+name = "clipboard_macos"
+version = "0.1.0-alpha"
 authors = ["Héctor Ramón Jiménez <hector0193@gmail.com>"]
 edition = "2018"
+description = "A library to obtain access to the macOS clipboard"
 license = "Apache-2.0"
+repository = "https://github.com/hecrj/window_clipboard"
+documentation = "https://docs.rs/clipboard_macos"
+keywords = ["clipboard", "macos"]
+
+[package.metadata.docs.rs]
+default-target = "x86_64-apple-darwin"
 
 [dependencies]
 objc = "0.2"

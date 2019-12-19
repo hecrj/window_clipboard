@@ -1,9 +1,13 @@
 [package]
-name = "window_clipboard_wayland"
-version = "0.1.0"
+name = "clipboard_wayland"
+version = "0.1.0-alpha"
 authors = ["Héctor Ramón Jiménez <hector0193@gmail.com>"]
 edition = "2018"
+description = "A library to obtain access to the clipboard of a Wayland window"
 license = "Apache-2.0"
+repository = "https://github.com/hecrj/window_clipboard"
+documentation = "https://docs.rs/clipboard_wayland"
+keywords = ["clipboard", "wayland"]
 
 [dependencies]
 smithay-clipboard = "0.3.4"
