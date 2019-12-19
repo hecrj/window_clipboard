@@ -1,5 +1,8 @@
 use crate::ClipboardProvider;
 
+use raw_window_handle::HasRawWindowHandle;
+use std::error::Error;
+
 pub fn new_clipboard<W: HasRawWindowHandle>(
     _window: &W,
 ) -> Result<Box<dyn ClipboardProvider>, Box<dyn Error>> {

@@ -11,6 +11,8 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+#[macro_use]
+extern crate objc;
 
 use objc::runtime::{Class, Object};
 use objc_foundation::{INSArray, INSObject, INSString};
@@ -40,7 +42,7 @@ impl Clipboard {
         Ok(Clipboard { pasteboard })
     }
 
-    fn read(&self) -> Result<String, Box<dyn Error>> {
+    pub fn read(&self) -> Result<String, Box<dyn Error>> {
         let string_class: Id<NSObject> = {
             let cls: Id<Class> = unsafe { Id::from_ptr(class("NSString")) };
             unsafe { transmute(cls) }
@@ -66,7 +68,7 @@ impl Clipboard {
         }
     }
 
-    fn write(&mut self, data: String) -> Result<(), Box<dyn Error>> {
+    pub fn write(&mut self, data: String) -> Result<(), Box<dyn Error>> {
         let string_array = NSArray::from_vec(vec![NSString::from_str(&data)]);
         let _: usize = unsafe { msg_send![self.pasteboard, clearContents] };
         let success: bool =
