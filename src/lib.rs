@@ -2,6 +2,7 @@
     unix,
     not(any(
         target_os = "macos",
+        target_os = "ios",
         target_os = "android",
         target_os = "emscripten"
     ))
@@ -12,6 +13,7 @@ mod platform;
 #[cfg(not(all(
     unix,
     not(any(
+        target_os = "ios",
         target_os = "macos",
         target_os = "android",
         target_os = "emscripten"
