@@ -46,11 +46,22 @@ mod clipboard_ios {
             Ok(Self)
         }
     }
+    #[derive(Debug)]
+    #[allow(non_camel_case_types)]
+    pub enum iOSClipboardError {
+        Unimplemented,
+    }
+    impl std::fmt::Display for iOSClipboardError {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            write!(f, "Unimplemented")
+        }
+    }
+    impl Error for iOSClipboardError { }
 }
 
 #[cfg(target_os = "ios")]
 impl ClipboardProvider for clipboard_ios::Clipboard {
     fn read(&self) -> Result<String, Box<dyn Error>> {
-        unimplemented!();
+        Err(Box::new(clipboard_ios::iOSClipboardError::Unimplemented))
     }
 }
