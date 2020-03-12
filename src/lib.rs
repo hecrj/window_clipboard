@@ -10,16 +10,16 @@
 #[path = "platform/linux.rs"]
 mod platform;
 
-#[cfg(not(all(
-    unix,
-    not(any(
-        target_os = "ios",
-        target_os = "macos",
-        target_os = "android",
-        target_os = "emscripten"
-    ))
-)))]
-#[path = "platform/not_linux.rs"]
+#[cfg(target_os = "windows")]
+#[path = "platform/windows.rs"]
+mod platform;
+
+#[cfg(target_os = "macos")]
+#[path = "platform/macos.rs"]
+mod platform;
+
+#[cfg(target_os = "ios")]
+#[path = "platform/ios.rs"]
 mod platform;
 
 use raw_window_handle::HasRawWindowHandle;
