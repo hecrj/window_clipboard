@@ -6,7 +6,7 @@ use std::error::Error;
 pub fn new_clipboard<W: HasRawWindowHandle>(
     _window: &W,
 ) -> Result<Box<dyn ClipboardProvider>, Box<dyn Error>> {
-    Ok(Box::new(clipboard_ios::Clipboard::new()?))
+    Ok(Box::new(Clipboard::new()?))
 }
 
 pub struct Clipboard;
@@ -31,8 +31,8 @@ impl std::fmt::Display for iOSClipboardError {
 
 impl Error for iOSClipboardError {}
 
-impl ClipboardProvider for clipboard_ios::Clipboard {
+impl ClipboardProvider for Clipboard {
     fn read(&self) -> Result<String, Box<dyn Error>> {
-        Err(Box::new(clipboard_ios::iOSClipboardError::Unimplemented))
+        Err(Box::new(iOSClipboardError::Unimplemented))
     }
 }
