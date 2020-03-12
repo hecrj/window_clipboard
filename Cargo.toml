@@ -1,6 +1,6 @@
 [package]
 name = "window_clipboard"
-version = "0.1.0-alpha.2"
+version = "0.1.0"
 authors = ["Héctor Ramón Jiménez <hector0193@gmail.com>"]
 edition = "2018"
 description = "A library to obtain clipboard access from a `raw-window-handle`"
@@ -18,11 +18,11 @@ raw-window-handle = "0.3"
 clipboard-win = "2.1"
 
 [target.'cfg(target_os = "macos")'.dependencies]
-clipboard_macos = { version = "=0.1.0-alpha", path = "./macos" }
+clipboard_macos = { version = "0.1.0", path = "./macos" }
 
 [target.'cfg(all(unix, not(any(target_os="macos", target_os="android", target_os="emscripten", target_os="ios"))))'.dependencies]
-clipboard_x11 = { version = "=0.1.0-alpha", path = "./x11" }
-clipboard_wayland = { version = "=0.1.0-alpha", path = "./wayland" }
+clipboard_x11 = { version = "0.1.0", path = "./x11" }
+clipboard_wayland = { version = "0.1.0", path = "./wayland" }
 
 [dev-dependencies]
 winit = "=0.20.0-alpha5"
