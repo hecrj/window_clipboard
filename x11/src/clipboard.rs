@@ -1,8 +1,8 @@
 use crate::error::Error;
+use std::ffi::c_void;
 use std::thread;
 use std::time::{Duration, Instant};
-use xcb::base::ConnError;
-use xcb::{Atom, Connection, Window};
+use xcb::{ffi::xcb_connection_t, Atom, Connection, Window};
 
 const POLL_DURATION: std::time::Duration = Duration::from_micros(50);
 
@@ -33,38 +33,26 @@ fn get_atom(connection: &Connection, name: &str) -> Result<Atom, Error> {
 }
 
 impl Clipboard {
-    /// Create Clipboard.
-    pub fn new(displayname: Option<&str>) -> Result<Self, Error> {
-        let (connection, screen) = Connection::connect(displayname)?;
-        let window = connection.generate_id();
+    /// Create Clipboard from an XLib display and window
+    pub unsafe fn new_xlib(
+        display: *mut c_void,
+        window: u64,
+    ) -> Result<Self, Error> {
+        let connection = Connection::new_from_xlib_display(display as *mut _);
+        Self::new_(connection, window as u32)
+    }
 
-        {
-            let screen = connection
-                .get_setup()
-                .roots()
-                .nth(screen as usize)
-                .ok_or(Error::XcbConn(ConnError::ClosedInvalidScreen))?;
-            xcb::create_window(
-                &connection,
-                xcb::COPY_FROM_PARENT as u8,
-                window,
-                screen.root(),
-                0,
-                0,
-                1,
-                1,
-                0,
-                xcb::WINDOW_CLASS_INPUT_OUTPUT as u16,
-                screen.root_visual(),
-                &[(
-                    xcb::CW_EVENT_MASK,
-                    xcb::EVENT_MASK_STRUCTURE_NOTIFY
-                        | xcb::EVENT_MASK_PROPERTY_CHANGE,
-                )],
-            );
-            connection.flush();
-        }
+    /// Create Clipboard from an XCB connection and window
+    pub unsafe fn new_xcb(
+        connection: *mut c_void,
+        window: Window,
+    ) -> Result<Self, Error> {
+        let connection =
+            Connection::from_raw_conn(connection as *mut xcb_connection_t);
+        Self::new_(connection, window)
+    }
 
+    fn new_(connection: Connection, window: Window) -> Result<Self, Error> {
         macro_rules! intern_atom {
             ( $name:expr ) => {
                 get_atom(&connection, $name)?

@@ -10,4 +10,4 @@ documentation = "https://docs.rs/clipboard_x11"
 keywords = ["clipboard", "x11"]
 
 [dependencies]
-xcb = { version = "0.9", features = ["thread"] }
+xcb = { version = "0.9", features = ["thread", "xlib_xcb"] }

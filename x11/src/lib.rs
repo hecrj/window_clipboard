@@ -1,6 +1,7 @@
 mod clipboard;
 mod error;
 
+use std::ffi::c_void;
 pub use xcb::*;
 
 use std::error::Error;
@@ -8,10 +9,23 @@ use std::error::Error;
 pub struct Clipboard(clipboard::Clipboard);
 
 impl Clipboard {
-    pub fn new() -> Result<Clipboard, Box<dyn Error>> {
-        Ok(Clipboard(clipboard::Clipboard::new(None)?))
+    /// Create Clipboard from an XLib display and window
+    pub unsafe fn new_xlib(
+        display: *mut c_void,
+        window: u64,
+    ) -> Result<Clipboard, Box<dyn Error>> {
+        Ok(Clipboard(clipboard::Clipboard::new_xlib(display, window)?))
     }
 
+    /// Create Clipboard from an XCB connection and window
+    pub unsafe fn new_xcb(
+        connection: *mut c_void,
+        window: Window,
+    ) -> Result<Clipboard, Box<dyn Error>> {
+        Ok(Clipboard(clipboard::Clipboard::new_xcb(connection, window)?))
+    }
+
+    /// Read clipboard contents as a String
     pub fn read(&self) -> Result<String, Box<dyn Error>> {
         Ok(String::from_utf8(self.0.load(
             self.0.atoms.clipboard,
