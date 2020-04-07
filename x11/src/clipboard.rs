@@ -8,24 +8,19 @@ const POLL_DURATION: std::time::Duration = Duration::from_micros(50);
 
 #[derive(Clone, Debug)]
 pub struct Atoms {
-    pub primary: Atom,
+    // pub primary: Atom,
     pub clipboard: Atom,
     pub property: Atom,
-    pub targets: Atom,
-    pub string: Atom,
+    // pub targets: Atom,
+    // pub string: Atom,
     pub utf8_string: Atom,
     pub incr: Atom,
 }
 
 /// X11 Clipboard
 pub struct Clipboard {
-    pub getter: Context,
-}
-
-pub struct Context {
-    pub connection: Connection,
-    pub screen: i32,
-    pub window: Window,
+    connection: Connection,
+    window: Window,
     pub atoms: Atoms,
 }
 
@@ -37,7 +32,8 @@ fn get_atom(connection: &Connection, name: &str) -> Result<Atom, Error> {
         .map_err(Into::into)
 }
 
-impl Context {
+impl Clipboard {
+    /// Create Clipboard.
     pub fn new(displayname: Option<&str>) -> Result<Self, Error> {
         let (connection, screen) = Connection::connect(displayname)?;
         let window = connection.generate_id();
@@ -76,30 +72,20 @@ impl Context {
         }
 
         let atoms = Atoms {
-            primary: xcb::ATOM_PRIMARY,
+            // primary: xcb::ATOM_PRIMARY,
             clipboard: intern_atom!("CLIPBOARD"),
             property: intern_atom!("THIS_CLIPBOARD_OUT"),
-            targets: intern_atom!("TARGETS"),
-            string: xcb::ATOM_STRING,
+            // targets: intern_atom!("TARGETS"),
+            // string: xcb::ATOM_STRING,
             utf8_string: intern_atom!("UTF8_STRING"),
             incr: intern_atom!("INCR"),
         };
 
-        Ok(Context {
+        Ok(Clipboard {
             connection,
-            screen,
             window,
             atoms,
         })
-    }
-}
-
-impl Clipboard {
-    /// Create Clipboard.
-    pub fn new() -> Result<Self, Error> {
-        let getter = Context::new(None)?;
-
-        Ok(Clipboard { getter })
     }
 
     fn process_event<T>(
@@ -127,7 +113,7 @@ impl Clipboard {
                 }
             }
 
-            let event = match self.getter.connection.poll_for_event() {
+            let event = match self.connection.poll_for_event() {
                 Some(event) => event,
                 None => {
                     thread::park_timeout(POLL_DURATION);
@@ -153,9 +139,9 @@ impl Clipboard {
                     }
 
                     let reply = xcb::get_property(
-                        &self.getter.connection,
+                        &self.connection,
                         false,
-                        self.getter.window,
+                        self.window,
                         event.property(),
                         xcb::ATOM_ANY,
                         buff.len() as u32,
@@ -163,16 +149,16 @@ impl Clipboard {
                     )
                     .get_reply()?;
 
-                    if reply.type_() == self.getter.atoms.incr {
+                    if reply.type_() == self.atoms.incr {
                         if let Some(&size) = reply.value::<i32>().get(0) {
                             buff.reserve(size as usize);
                         }
                         xcb::delete_property(
-                            &self.getter.connection,
-                            self.getter.window,
+                            &self.connection,
+                            self.window,
                             property,
                         );
-                        self.getter.connection.flush();
+                        self.connection.flush();
                         is_incr = true;
                         continue;
                     } else if reply.type_() != target {
@@ -191,9 +177,9 @@ impl Clipboard {
                     };
 
                     let length = xcb::get_property(
-                        &self.getter.connection,
+                        &self.connection,
                         false,
-                        self.getter.window,
+                        self.window,
                         property,
                         xcb::ATOM_ANY,
                         0,
@@ -203,9 +189,9 @@ impl Clipboard {
                     .map(|reply| reply.bytes_after())?;
 
                     let reply = xcb::get_property(
-                        &self.getter.connection,
+                        &self.connection,
                         true,
-                        self.getter.window,
+                        self.window,
                         property,
                         xcb::ATOM_ANY,
                         0,
@@ -244,8 +230,8 @@ impl Clipboard {
         let timeout = timeout.into();
 
         xcb::convert_selection(
-            &self.getter.connection,
-            self.getter.window,
+            &self.connection,
+            self.window,
             selection,
             target,
             property,
@@ -253,15 +239,11 @@ impl Clipboard {
                                // Clients should not use CurrentTime for the time argument of a ConvertSelection request.
                                // Instead, they should use the timestamp of the event that caused the request to be made.
         );
-        self.getter.connection.flush();
+        self.connection.flush();
 
         self.process_event(&mut buff, selection, target, property, timeout)?;
-        xcb::delete_property(
-            &self.getter.connection,
-            self.getter.window,
-            property,
-        );
-        self.getter.connection.flush();
+        xcb::delete_property(&self.connection, self.window, property);
+        self.connection.flush();
         Ok(buff)
     }
 }
