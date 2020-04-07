@@ -114,22 +114,17 @@ impl Clipboard {
         T: Into<Option<Duration>>,
     {
         let mut is_incr = false;
-        let timeout = timeout.into();
-        let start_time = if timeout.is_some() {
-            Some(Instant::now())
+        let end_time = if let Some(dur) = timeout.into() {
+            Some(Instant::now() + dur)
         } else {
             None
         };
 
         loop {
-            if timeout
-                .into_iter()
-                .zip(start_time)
-                .next()
-                .map(|(timeout, time)| (Instant::now() - time) >= timeout)
-                .unwrap_or(false)
-            {
-                return Err(Error::Timeout);
+            if let Some(end) = end_time {
+                if Instant::now() > end {
+                    return Err(Error::Timeout);
+                }
             }
 
             let event = match self.getter.connection.poll_for_event() {
