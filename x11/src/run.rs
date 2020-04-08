@@ -6,6 +6,7 @@ use xcb::{self, Atom, Connection};
 
 const INCR_CHUNK_SIZE: usize = 4000;
 
+// Map of (Selection, (Target, Value))
 pub type SetMap = Arc<RwLock<HashMap<Atom, (Atom, Vec<u8>)>>>;
 
 macro_rules! try_continue {
@@ -36,6 +37,7 @@ pub fn run(
     let mut state_map = HashMap::new();
 
     while let Some(event) = connection.wait_for_event() {
+        // Abort any on-going INCR sends, since our value just changed:
         while let Ok(selection) = receiver.try_recv() {
             if let Some(property) = incr_map.remove(&selection) {
                 state_map.remove(&property);
@@ -51,7 +53,11 @@ pub fn run(
                 let &(target, ref value) =
                     try_continue!(read_map.get(&event.selection()));
 
+                // TODO: support target == MULTIPLE. This is required by ICCCM,
+                // but apparently isn't breaking anything?
                 if event.target() == targets {
+                    // Notify recipient of supported targets. We do not support
+                    // multiple targets or conversion, so this is simple.
                     xcb::change_property(
                         &connection,
                         xcb::PROP_MODE_REPLACE as u8,
@@ -62,6 +68,7 @@ pub fn run(
                         &[targets, target],
                     );
                 } else if value.len() < max_length - 24 {
+                    // Directly send the value.
                     xcb::change_property(
                         &connection,
                         xcb::PROP_MODE_REPLACE as u8,
@@ -72,6 +79,7 @@ pub fn run(
                         value,
                     );
                 } else {
+                    // Send via INCR.
                     xcb::change_window_attributes(
                         &connection,
                         event.requestor(),

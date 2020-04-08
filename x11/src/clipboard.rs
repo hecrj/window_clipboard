@@ -1,3 +1,7 @@
+// Implements basic clipboard functionality for X11. This is signficantly more
+// complex than might be expected. This article is a great read on the subject:
+// https://www.uninformativ.de/blog/postings/2017-04-02/0/POSTING-en.html
+
 use crate::error::Error;
 use crate::run::{run, SetMap};
 use std::ffi::c_void;
@@ -78,6 +82,8 @@ impl Clipboard {
         let incr = atoms.incr;
 
         let (sender, receiver) = channel();
+
+        // Units are "four-byte units", hence multiplication by 4:
         let max_length = connection.get_maximum_request_length() as usize * 4;
 
         let connection = Arc::new(connection);
@@ -226,29 +232,39 @@ impl Clipboard {
         Ok(())
     }
 
-    /// load value.
-    pub fn load<T>(
+    /// Read a value from a selection
+    ///
+    /// Parameters:
+    ///
+    /// - `selection`: e.g. `atoms.clipboard`
+    /// - `target`: the content type desired; e.g. `atoms.utf8_string`
+    /// - `timeout`:
+    pub fn read<T>(
         &self,
         selection: Atom,
         target: Atom,
-        property: Atom,
         timeout: T,
     ) -> Result<Vec<u8>, Error>
     where
         T: Into<Option<Duration>>,
     {
+        let property = self.atoms.property;
         let mut buff = Vec::new();
         let timeout = timeout.into();
 
+        // FIXME: Clients should not use CurrentTime for the time argument of a
+        // ConvertSelection request. Instead, they should use the timestamp of
+        // the event that caused the request to be made.
+        let time = xcb::CURRENT_TIME;
+
+        // Request transfer of selection to property
         xcb::convert_selection(
             &self.connection,
             self.window,
             selection,
             target,
             property,
-            xcb::CURRENT_TIME, // FIXME ^
-                               // Clients should not use CurrentTime for the time argument of a ConvertSelection request.
-                               // Instead, they should use the timestamp of the event that caused the request to be made.
+            time,
         );
         self.connection.flush();
 
@@ -258,8 +274,14 @@ impl Clipboard {
         Ok(buff)
     }
 
-    /// store value.
-    pub fn store<T: Into<Vec<u8>>>(
+    /// Write a value to a selection
+    ///
+    /// Parameters:
+    ///
+    /// - `selection`: e.g. `atoms.clipboard`
+    /// - `target`: the content type; e.g. `atoms.utf8_string`
+    /// - `value`: the value as a byte array
+    pub fn write<T: Into<Vec<u8>>>(
         &self,
         selection: Atom,
         target: Atom,

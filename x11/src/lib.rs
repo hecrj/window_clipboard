@@ -30,17 +30,16 @@ impl Clipboard {
 
     /// Read clipboard contents as a String
     pub fn read(&self) -> Result<String, Box<dyn Error>> {
-        Ok(String::from_utf8(self.0.load(
+        Ok(String::from_utf8(self.0.read(
             self.0.atoms.clipboard,
             self.0.atoms.utf8_string,
-            self.0.atoms.property,
             std::time::Duration::from_secs(3),
         )?)?)
     }
 
     /// Write clipboard contents from a String
     pub fn write(&self, text: String) -> Result<(), Box<dyn Error>> {
-        Ok(self.0.store(
+        Ok(self.0.write(
             self.0.atoms.clipboard,
             self.0.atoms.utf8_string,
             text,
