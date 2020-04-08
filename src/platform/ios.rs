@@ -35,4 +35,11 @@ impl ClipboardProvider for Clipboard {
     fn read(&self) -> Result<String, Box<dyn Error>> {
         Err(Box::new(iOSClipboardError::Unimplemented))
     }
+
+    fn write(
+        &self,
+        _string: std::borrow::Cow<str>,
+    ) -> Result<(), Box<dyn Error>> {
+        Err(Box::new(iOSClipboardError::Unimplemented))
+    }
 }

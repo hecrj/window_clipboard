@@ -43,8 +43,19 @@ impl Clipboard {
         // Maybe we should make `read` mutable (?)
         self.raw.read()
     }
+
+    pub fn write(
+        &mut self,
+        string: std::borrow::Cow<str>,
+    ) -> Result<(), Box<dyn Error>> {
+        self.raw.write(string)
+    }
 }
 
 pub trait ClipboardProvider {
     fn read(&self) -> Result<String, Box<dyn Error>>;
+    fn write(
+        &mut self,
+        string: std::borrow::Cow<str>,
+    ) -> Result<(), Box<dyn Error>>;
 }

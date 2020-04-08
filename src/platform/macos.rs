@@ -13,4 +13,11 @@ impl ClipboardProvider for clipboard_macos::Clipboard {
     fn read(&self) -> Result<String, Box<dyn Error>> {
         self.read()
     }
+
+    fn write(
+        &self,
+        _string: std::borrow::Cow<str>,
+    ) -> Result<(), Box<dyn Error>> {
+        // TODO
+    }
 }

@@ -50,10 +50,24 @@ impl ClipboardProvider for wayland::Clipboard {
     fn read(&self) -> Result<String, Box<dyn Error>> {
         self.read()
     }
+
+    fn write(
+        &mut self,
+        string: std::borrow::Cow<str>,
+    ) -> Result<(), Box<dyn Error>> {
+        wayland::Clipboard::write(self, string.to_string())
+    }
 }
 
 impl ClipboardProvider for x11::Clipboard {
     fn read(&self) -> Result<String, Box<dyn Error>> {
         self.read()
+    }
+
+    fn write(
+        &mut self,
+        string: std::borrow::Cow<str>,
+    ) -> Result<(), Box<dyn Error>> {
+        x11::Clipboard::write(self, string.to_string())
     }
 }

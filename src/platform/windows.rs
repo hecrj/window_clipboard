@@ -17,4 +17,11 @@ impl ClipboardProvider for Clipboard {
     fn read(&self) -> Result<String, Box<dyn Error>> {
         Ok(get_clipboard_string()?)
     }
+
+    fn write(
+        &self,
+        _string: std::borrow::Cow<str>,
+    ) -> Result<(), Box<dyn Error>> {
+        // TODO
+    }
 }
