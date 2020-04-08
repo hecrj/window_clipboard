@@ -1,5 +1,6 @@
 mod clipboard;
 mod error;
+mod run;
 
 use std::ffi::c_void;
 pub use xcb::*;
@@ -22,7 +23,9 @@ impl Clipboard {
         connection: *mut c_void,
         window: Window,
     ) -> Result<Clipboard, Box<dyn Error>> {
-        Ok(Clipboard(clipboard::Clipboard::new_xcb(connection, window)?))
+        Ok(Clipboard(clipboard::Clipboard::new_xcb(
+            connection, window,
+        )?))
     }
 
     /// Read clipboard contents as a String
@@ -33,5 +36,14 @@ impl Clipboard {
             self.0.atoms.property,
             std::time::Duration::from_secs(3),
         )?)?)
+    }
+
+    /// Write clipboard contents from a String
+    pub fn write(&self, text: String) -> Result<(), Box<dyn Error>> {
+        Ok(self.0.store(
+            self.0.atoms.clipboard,
+            self.0.atoms.utf8_string,
+            text,
+        )?)
     }
 }

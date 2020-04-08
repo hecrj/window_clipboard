@@ -1,5 +1,10 @@
 use crate::error::Error;
+use crate::run::{run, SetMap};
 use std::ffi::c_void;
+use std::sync::{
+    mpsc::{channel, Sender},
+    Arc,
+};
 use std::thread;
 use std::time::{Duration, Instant};
 use xcb::{ffi::xcb_connection_t, Atom, Connection, Window};
@@ -19,8 +24,10 @@ pub struct Atoms {
 
 /// X11 Clipboard
 pub struct Clipboard {
-    connection: Connection,
+    connection: Arc<Connection>,
     window: Window,
+    setmap: SetMap,
+    send: Sender<Atom>,
     pub atoms: Atoms,
 }
 
@@ -63,15 +70,31 @@ impl Clipboard {
             // primary: xcb::ATOM_PRIMARY,
             clipboard: intern_atom!("CLIPBOARD"),
             property: intern_atom!("THIS_CLIPBOARD_OUT"),
-            // targets: intern_atom!("TARGETS"),
             // string: xcb::ATOM_STRING,
             utf8_string: intern_atom!("UTF8_STRING"),
             incr: intern_atom!("INCR"),
         };
+        let targets = intern_atom!("TARGETS");
+        let incr = atoms.incr;
+
+        let (sender, receiver) = channel();
+        let max_length = connection.get_maximum_request_length() as usize * 4;
+
+        let connection = Arc::new(connection);
+        let conn2 = connection.clone();
+
+        let setmap = SetMap::default();
+        let setmap2 = setmap.clone();
+
+        thread::spawn(move || {
+            run(&conn2, &setmap2, targets, incr, max_length, &receiver)
+        });
 
         Ok(Clipboard {
             connection,
             window,
+            setmap,
+            send: sender,
             atoms,
         })
     }
@@ -233,5 +256,38 @@ impl Clipboard {
         xcb::delete_property(&self.connection, self.window, property);
         self.connection.flush();
         Ok(buff)
+    }
+
+    /// store value.
+    pub fn store<T: Into<Vec<u8>>>(
+        &self,
+        selection: Atom,
+        target: Atom,
+        value: T,
+    ) -> Result<(), Error> {
+        self.send.send(selection)?;
+        self.setmap
+            .write()
+            .map_err(|_| Error::Lock)?
+            .insert(selection, (target, value.into()));
+
+        xcb::set_selection_owner(
+            &self.connection,
+            self.window,
+            selection,
+            xcb::CURRENT_TIME,
+        );
+
+        self.connection.flush();
+
+        if xcb::get_selection_owner(&self.connection, selection)
+            .get_reply()
+            .map(|reply| reply.owner() == self.window)
+            .unwrap_or(false)
+        {
+            Ok(())
+        } else {
+            Err(Error::Owner)
+        }
     }
 }
