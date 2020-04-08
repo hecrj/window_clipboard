@@ -15,7 +15,7 @@ categories = ["gui"]
 raw-window-handle = "0.3"
 
 [target.'cfg(windows)'.dependencies]
-clipboard-win = "2.1"
+clipboard-win = "3.0"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 clipboard_macos = { version = "0.1.0", path = "./macos" }

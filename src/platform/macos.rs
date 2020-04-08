@@ -15,9 +15,9 @@ impl ClipboardProvider for clipboard_macos::Clipboard {
     }
 
     fn write(
-        &self,
-        _string: std::borrow::Cow<str>,
+        &mut self,
+        string: std::borrow::Cow<str>,
     ) -> Result<(), Box<dyn Error>> {
-        // TODO
+        self.write(string.to_string())
     }
 }

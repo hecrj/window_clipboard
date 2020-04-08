@@ -1,6 +1,5 @@
 use crate::ClipboardProvider;
 
-use clipboard_win::get_clipboard_string;
 use raw_window_handle::HasRawWindowHandle;
 
 use std::error::Error;
@@ -15,13 +14,13 @@ pub struct Clipboard;
 
 impl ClipboardProvider for Clipboard {
     fn read(&self) -> Result<String, Box<dyn Error>> {
-        Ok(get_clipboard_string()?)
+        Ok(clipboard_win::get_clipboard_string()?)
     }
 
     fn write(
-        &self,
-        _string: std::borrow::Cow<str>,
+        &mut self,
+        string: std::borrow::Cow<str>,
     ) -> Result<(), Box<dyn Error>> {
-        // TODO
+        Ok(clipboard_win::set_clipboard_string(&string)?)
     }
 }
