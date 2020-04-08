@@ -4,16 +4,14 @@
 
 use crate::error::Error;
 use crate::run::{run, SetMap};
-use std::ffi::c_void;
-use std::sync::{
-    mpsc::{channel, Sender},
-    Arc,
-};
+use std::ffi::{c_void, CStr};
+use std::sync::mpsc::{channel, Sender};
+use std::sync::Arc;
 use std::thread;
 use std::time::{Duration, Instant};
-use xcb::{ffi::xcb_connection_t, Atom, Connection, Window};
+use xcb::{Atom, ConnError, Connection, Window};
 
-const POLL_DURATION: std::time::Duration = Duration::from_micros(50);
+const POLL_DURATION: std::time::Duration = Duration::from_millis(10);
 
 #[derive(Clone, Debug)]
 pub struct Atoms {
@@ -28,15 +26,17 @@ pub struct Atoms {
 
 /// X11 Clipboard
 pub struct Clipboard {
-    connection: Arc<Connection>,
+    connection: Connection,
+    setter_conn: Arc<Connection>,
     window: Window,
+    setter_window: Window,
     setmap: SetMap,
     send: Sender<Atom>,
     pub atoms: Atoms,
 }
 
 #[inline]
-fn get_atom(connection: &Connection, name: &str) -> Result<Atom, Error> {
+pub fn get_atom(connection: &Connection, name: &str) -> Result<Atom, Error> {
     xcb::intern_atom(connection, false, name)
         .get_reply()
         .map(|reply| reply.atom())
@@ -44,50 +44,77 @@ fn get_atom(connection: &Connection, name: &str) -> Result<Atom, Error> {
 }
 
 impl Clipboard {
-    /// Create Clipboard from an XLib display and window
-    pub unsafe fn new_xlib(
-        display: *mut c_void,
-        window: u64,
-    ) -> Result<Self, Error> {
-        let connection = Connection::new_from_xlib_display(display as *mut _);
-        Self::new_(connection, window as u32)
+    /// Create Clipboard from an XLib display
+    pub unsafe fn new_xlib(display: *mut c_void) -> Result<Self, Error> {
+        // Note: we *must* create a new connection since we require an
+        // independent event loop, hence we only get the display name here.
+        let s = x11::xlib::XDisplayString(display as *mut x11::xlib::Display);
+        let displayname = CStr::from_ptr(s).to_str().ok();
+        Self::new(displayname)
     }
 
-    /// Create Clipboard from an XCB connection and window
-    pub unsafe fn new_xcb(
-        connection: *mut c_void,
-        window: Window,
-    ) -> Result<Self, Error> {
-        let connection =
-            Connection::from_raw_conn(connection as *mut xcb_connection_t);
-        Self::new_(connection, window)
+    /// Create Clipboard from an XCB connection
+    pub unsafe fn new_xcb(_connection: *mut c_void) -> Result<Self, Error> {
+        // Note: we *must* create a new connection since we require an
+        // independent event loop, hence we only get the display name here.
+        // TODO: get display name from connection
+        Self::new(None)
     }
 
-    fn new_(connection: Connection, window: Window) -> Result<Self, Error> {
-        macro_rules! intern_atom {
-            ( $name:expr ) => {
-                get_atom(&connection, $name)?
-            };
-        }
+    /// Create Clipboard from an optional display name
+    fn new(displayname: Option<&str>) -> Result<Self, Error> {
+        let make_window = || -> Result<(Connection, Window), Error> {
+            let (connection, screen) = Connection::connect(displayname)?;
+            let window = connection.generate_id();
+
+            let screen = connection
+                .get_setup()
+                .roots()
+                .nth(screen as usize)
+                .ok_or(Error::XcbConn(ConnError::ClosedInvalidScreen))?;
+            xcb::create_window(
+                &connection,
+                xcb::COPY_FROM_PARENT as u8,
+                window,
+                screen.root(),
+                std::i16::MIN,
+                std::i16::MIN,
+                1,
+                1,
+                0,
+                xcb::WINDOW_CLASS_INPUT_OUTPUT as u16,
+                screen.root_visual(),
+                &[(
+                    xcb::CW_EVENT_MASK,
+                    xcb::EVENT_MASK_STRUCTURE_NOTIFY
+                        | xcb::EVENT_MASK_PROPERTY_CHANGE,
+                )],
+            );
+            connection.flush();
+
+            Ok((connection, window))
+        };
+
+        let (connection, window) = make_window()?;
+        let (setter_conn, setter_window) = make_window()?;
+        let setter_conn = Arc::new(setter_conn);
+        let conn2 = setter_conn.clone();
 
         let atoms = Atoms {
             // primary: xcb::ATOM_PRIMARY,
-            clipboard: intern_atom!("CLIPBOARD"),
-            property: intern_atom!("THIS_CLIPBOARD_OUT"),
+            clipboard: get_atom(&connection, "CLIPBOARD")?,
+            property: get_atom(&connection, "THIS_CLIPBOARD_OUT")?,
             // string: xcb::ATOM_STRING,
-            utf8_string: intern_atom!("UTF8_STRING"),
-            incr: intern_atom!("INCR"),
+            utf8_string: get_atom(&connection, "UTF8_STRING")?,
+            incr: get_atom(&connection, "INCR")?,
         };
-        let targets = intern_atom!("TARGETS");
+        let targets = get_atom(&connection, "TARGETS")?;
         let incr = atoms.incr;
 
         let (sender, receiver) = channel();
 
         // Units are "four-byte units", hence multiplication by 4:
         let max_length = connection.get_maximum_request_length() as usize * 4;
-
-        let connection = Arc::new(connection);
-        let conn2 = connection.clone();
 
         let setmap = SetMap::default();
         let setmap2 = setmap.clone();
@@ -98,7 +125,9 @@ impl Clipboard {
 
         Ok(Clipboard {
             connection,
+            setter_conn,
             window,
+            setter_window,
             setmap,
             send: sender,
             atoms,
@@ -294,17 +323,17 @@ impl Clipboard {
             .insert(selection, (target, value.into()));
 
         xcb::set_selection_owner(
-            &self.connection,
-            self.window,
+            &self.setter_conn,
+            self.setter_window,
             selection,
             xcb::CURRENT_TIME,
         );
 
-        self.connection.flush();
+        self.setter_conn.flush();
 
-        if xcb::get_selection_owner(&self.connection, selection)
+        if xcb::get_selection_owner(&self.setter_conn, selection)
             .get_reply()
-            .map(|reply| reply.owner() == self.window)
+            .map(|reply| reply.owner() == self.setter_window)
             .unwrap_or(false)
         {
             Ok(())

@@ -11,3 +11,4 @@ keywords = ["clipboard", "x11"]
 
 [dependencies]
 xcb = { version = "0.9", features = ["thread", "xlib_xcb"] }
+x11 = "2.18"

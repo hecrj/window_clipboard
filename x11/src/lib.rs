@@ -13,19 +13,15 @@ impl Clipboard {
     /// Create Clipboard from an XLib display and window
     pub unsafe fn new_xlib(
         display: *mut c_void,
-        window: u64,
     ) -> Result<Clipboard, Box<dyn Error>> {
-        Ok(Clipboard(clipboard::Clipboard::new_xlib(display, window)?))
+        Ok(Clipboard(clipboard::Clipboard::new_xlib(display)?))
     }
 
     /// Create Clipboard from an XCB connection and window
     pub unsafe fn new_xcb(
         connection: *mut c_void,
-        window: Window,
     ) -> Result<Clipboard, Box<dyn Error>> {
-        Ok(Clipboard(clipboard::Clipboard::new_xcb(
-            connection, window,
-        )?))
+        Ok(Clipboard(clipboard::Clipboard::new_xcb(connection)?))
     }
 
     /// Read clipboard contents as a String

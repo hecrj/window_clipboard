@@ -30,16 +30,14 @@ pub fn new_clipboard<W: HasRawWindowHandle>(
         }
         RawWindowHandle::Xcb(handle) => {
             assert!(!handle.connection.is_null());
-            let clipboard = unsafe {
-                x11::Clipboard::new_xcb(handle.connection, handle.window)?
-            };
+            let clipboard =
+                unsafe { x11::Clipboard::new_xcb(handle.connection)? };
             Ok(Box::new(clipboard))
         }
         RawWindowHandle::Xlib(handle) => {
             assert!(!handle.display.is_null());
-            let clipboard = unsafe {
-                x11::Clipboard::new_xlib(handle.display, handle.window)?
-            };
+            let clipboard =
+                unsafe { x11::Clipboard::new_xlib(handle.display)? };
             Ok(Box::new(clipboard))
         }
         h => Err(Box::new(Unsupported(h))),
