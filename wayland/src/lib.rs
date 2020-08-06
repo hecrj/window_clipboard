@@ -16,27 +16,25 @@ use std::error::Error;
 use std::ffi::c_void;
 use std::sync::{Arc, Mutex};
 
-use smithay_clipboard::WaylandClipboard;
-
 pub struct Clipboard {
-    context: Arc<Mutex<WaylandClipboard>>,
+    context: Arc<Mutex<smithay_clipboard::Clipboard>>,
 }
 
 impl Clipboard {
     pub unsafe fn new(display: *mut c_void) -> Clipboard {
-        let context = Arc::new(Mutex::new(
-            WaylandClipboard::new_from_external(display as *mut _),
-        ));
+        let context = Arc::new(Mutex::new(smithay_clipboard::Clipboard::new(
+            display as *mut _,
+        )));
 
         Clipboard { context }
     }
 
     pub fn read(&self) -> Result<String, Box<dyn Error>> {
-        Ok(self.context.lock().unwrap().load(None))
+        Ok(self.context.lock().unwrap().load()?)
     }
 
     pub fn write(&mut self, data: String) -> Result<(), Box<dyn Error>> {
-        self.context.lock().unwrap().store(None, data);
+        self.context.lock().unwrap().store(data);
 
         Ok(())
     }
