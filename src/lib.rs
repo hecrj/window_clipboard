@@ -43,8 +43,13 @@ impl Clipboard {
         // Maybe we should make `read` mutable (?)
         self.raw.read()
     }
+
+    pub fn write(&self, s: String) -> Result<(), Box<dyn Error>> {
+        self.raw.write(s)
+    }
 }
 
 pub trait ClipboardProvider {
     fn read(&self) -> Result<String, Box<dyn Error>>;
+    fn write(&self, s: String) -> Result<(), Box<dyn Error>>;
 }

@@ -20,4 +20,12 @@ impl Clipboard {
             std::time::Duration::from_secs(3),
         )?)?)
     }
+
+    pub fn write(&self, s: String) -> Result<(), Box<dyn Error>> {
+        Ok(self.0.store(
+            self.0.setter.atoms.clipboard,
+            self.0.setter.atoms.utf8_string,
+            s,
+        )?)
+    }
 }

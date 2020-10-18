@@ -33,7 +33,7 @@ impl Clipboard {
         Ok(self.context.lock().unwrap().load()?)
     }
 
-    pub fn write(&mut self, data: String) -> Result<(), Box<dyn Error>> {
+    pub fn write(&self, data: String) -> Result<(), Box<dyn Error>> {
         self.context.lock().unwrap().store(data);
 
         Ok(())

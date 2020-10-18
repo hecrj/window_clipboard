@@ -15,9 +15,17 @@ fn main() {
 
     let clipboard = Clipboard::new(&window).expect("Create clipboard");
 
+    let mut i = 0;
+
     event_loop.run(move |event, _, control_flow| match event {
         Event::MainEventsCleared => {
-            println!("{:?}", clipboard.read());
+            println!(
+                "write: {:?}",
+                clipboard.write(format!("hello world {}", i))
+            );
+            i += 1;
+
+            println!("read: {:?}", clipboard.read());
         }
         Event::WindowEvent {
             event: WindowEvent::CloseRequested,

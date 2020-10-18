@@ -68,7 +68,7 @@ impl Clipboard {
         }
     }
 
-    pub fn write(&mut self, data: String) -> Result<(), Box<dyn Error>> {
+    pub fn write(&self, data: String) -> Result<(), Box<dyn Error>> {
         let string_array = NSArray::from_vec(vec![NSString::from_str(&data)]);
         let _: usize = unsafe { msg_send![self.pasteboard, clearContents] };
         let success: bool =

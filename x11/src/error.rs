@@ -10,6 +10,7 @@ pub enum Error {
     Set(SendError<Atom>),
     XcbConn(ConnError),
     XcbGeneric(GenericError),
+    Lock,
     Timeout,
     Owner,
     UnexpectedType(Atom),
@@ -21,6 +22,7 @@ impl fmt::Display for Error {
             Error::Set(e) => write!(f, "XCB - couldn't set atom: {:?}", e),
             Error::XcbConn(e) => write!(f, "XCB connection error: {:?}", e),
             Error::XcbGeneric(e) => write!(f, "XCB generic error: {:?}", e),
+            Error::Lock => write!(f, "XCB: Lock is poisoned"),
             Error::Timeout => write!(f, "Selection timed out"),
             Error::Owner => {
                 write!(f, "Failed to set new owner of XCB selection")
@@ -39,7 +41,7 @@ impl StdError for Error {
             Set(e) => Some(e),
             XcbConn(e) => Some(e),
             XcbGeneric(e) => Some(e),
-            Timeout | Owner | UnexpectedType(_) => None,
+            Lock | Timeout | Owner | UnexpectedType(_) => None,
         }
     }
 }
