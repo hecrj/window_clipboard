@@ -22,6 +22,10 @@ mod platform;
 #[path = "platform/ios.rs"]
 mod platform;
 
+#[cfg(target_os = "android")]
+#[path = "platform/android.rs"]
+mod platform;
+
 use raw_window_handle::HasRawWindowHandle;
 use std::error::Error;
 
