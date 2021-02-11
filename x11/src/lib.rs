@@ -1,8 +1,6 @@
 mod clipboard;
 mod error;
 
-pub use xcb::*;
-
 use std::error::Error;
 
 pub struct Clipboard(clipboard::Clipboard);
