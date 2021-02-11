@@ -1,7 +1,6 @@
+#[forbid(unsafe_code)]
 mod clipboard;
 mod error;
-
-pub use xcb::*;
 
 use std::error::Error;
 
