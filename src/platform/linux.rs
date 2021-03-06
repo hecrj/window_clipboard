@@ -27,10 +27,18 @@ impl ClipboardProvider for wayland::Clipboard {
     fn read(&self) -> Result<String, Box<dyn Error>> {
         self.read()
     }
+
+    fn write(&mut self, contents: String) -> Result<(), Box<dyn Error>> {
+        self.write(contents)
+    }
 }
 
 impl ClipboardProvider for x11::Clipboard {
     fn read(&self) -> Result<String, Box<dyn Error>> {
-        self.read()
+        self.read().map_err(Box::from)
+    }
+
+    fn write(&mut self, contents: String) -> Result<(), Box<dyn Error>> {
+        self.write(contents).map_err(Box::from)
     }
 }

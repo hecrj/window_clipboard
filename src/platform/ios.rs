@@ -35,4 +35,8 @@ impl ClipboardProvider for Clipboard {
     fn read(&self) -> Result<String, Box<dyn Error>> {
         Err(Box::new(iOSClipboardError::Unimplemented))
     }
+
+    fn write(&mut self, contents: String) -> Result<(), Box<dyn Error>> {
+        Err(Box::new(AndroidClipboardError::Unimplemented))
+    }
 }

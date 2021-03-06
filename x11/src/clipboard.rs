@@ -1,14 +1,266 @@
 use crate::error::Error;
 
-use std::thread;
-use std::time::{Duration, Instant};
 use x11rb::connection::Connection as _;
 use x11rb::errors::ConnectError;
 use x11rb::protocol::xproto::{self, Atom, AtomEnum, Window};
 use x11rb::protocol::Event;
 use x11rb::rust_connection::RustConnection as Connection;
 
+use std::collections::HashMap;
+use std::sync::mpsc;
+use std::sync::{Arc, RwLock};
+use std::thread;
+use std::time::{Duration, Instant};
+
 const POLL_DURATION: std::time::Duration = Duration::from_micros(50);
+
+/// X11 Clipboard
+pub struct Clipboard {
+    reader: Context,
+    writer: Arc<Context>,
+    selections: Arc<RwLock<HashMap<Atom, (Atom, Vec<u8>)>>>,
+    worker: mpsc::Sender<Atom>,
+}
+
+impl Clipboard {
+    /// Create Clipboard.
+    pub fn new() -> Result<Self, Error> {
+        let reader = Context::new(None)?;
+        let writer = Arc::new(Context::new(None)?);
+        let selections = Arc::new(RwLock::new(HashMap::new()));
+        let (sender, receiver) = mpsc::channel();
+
+        let worker = Worker {
+            context: Arc::clone(&writer),
+            selections: Arc::clone(&selections),
+            receiver,
+        };
+
+        thread::spawn(move || worker.run());
+
+        Ok(Clipboard {
+            reader,
+            writer,
+            selections,
+            worker: sender,
+        })
+    }
+
+    pub fn read(&self) -> Result<String, Error> {
+        Ok(String::from_utf8(self.load(
+            self.reader.atoms.clipboard,
+            self.reader.atoms.utf8_string,
+            self.reader.atoms.property,
+            std::time::Duration::from_secs(3),
+        )?)
+        .map_err(Error::InvalidUtf8)?)
+    }
+
+    pub fn write(&mut self, contents: String) -> Result<(), Error> {
+        let selection = self.writer.atoms.clipboard;
+        let target = self.writer.atoms.utf8_string;
+
+        let _ = self.worker.send(selection)?;
+
+        self.selections
+            .write()
+            .map_err(|_| Error::SelectionLocked)?
+            .insert(selection, (target, contents.into()));
+
+        let _ = xproto::set_selection_owner(
+            &self.writer.connection,
+            self.writer.window,
+            selection,
+            x11rb::CURRENT_TIME,
+        )?;
+
+        let _ = self.writer.connection.flush()?;
+
+        let reply =
+            xproto::get_selection_owner(&self.writer.connection, selection)
+                .map_err(Into::into)
+                .and_then(|cookie| cookie.reply())?;
+
+        if reply.owner == self.writer.window {
+            Ok(())
+        } else {
+            Err(Error::InvalidOwner)
+        }
+    }
+
+    /// load value.
+    fn load(
+        &self,
+        selection: Atom,
+        target: Atom,
+        property: Atom,
+        timeout: impl Into<Option<Duration>>,
+    ) -> Result<Vec<u8>, Error> {
+        let mut buff = Vec::new();
+        let timeout = timeout.into();
+
+        let _ = xproto::convert_selection(
+            &self.reader.connection,
+            self.reader.window,
+            selection,
+            target,
+            property,
+            x11rb::CURRENT_TIME, // FIXME ^
+                                 // Clients should not use CurrentTime for the time argument of a ConvertSelection request.
+                                 // Instead, they should use the timestamp of the event that caused the request to be made.
+        )?;
+        let _ = self.reader.connection.flush()?;
+
+        self.process_event(&mut buff, selection, target, property, timeout)?;
+
+        let _ = xproto::delete_property(
+            &self.reader.connection,
+            self.reader.window,
+            property,
+        )?;
+        let _ = self.reader.connection.flush()?;
+
+        Ok(buff)
+    }
+
+    fn process_event<T>(
+        &self,
+        buff: &mut Vec<u8>,
+        selection: Atom,
+        target: Atom,
+        property: Atom,
+        timeout: T,
+    ) -> Result<(), Error>
+    where
+        T: Into<Option<Duration>>,
+    {
+        let mut is_incr = false;
+        let timeout = timeout.into();
+        let start_time = if timeout.is_some() {
+            Some(Instant::now())
+        } else {
+            None
+        };
+
+        loop {
+            if timeout
+                .into_iter()
+                .zip(start_time)
+                .next()
+                .map(|(timeout, time)| (Instant::now() - time) >= timeout)
+                .unwrap_or(false)
+            {
+                return Err(Error::Timeout);
+            }
+
+            let event = match self.reader.connection.poll_for_event()? {
+                Some(event) => event,
+                None => {
+                    thread::park_timeout(POLL_DURATION);
+                    continue;
+                }
+            };
+
+            match event {
+                Event::SelectionNotify(event) => {
+                    if event.selection != selection {
+                        continue;
+                    };
+
+                    // Note that setting the property argument to None indicates that the
+                    // conversion requested could not be made.
+                    if event.property == AtomEnum::NONE.into() {
+                        break;
+                    }
+
+                    let reply = xproto::get_property(
+                        &self.reader.connection,
+                        false,
+                        self.reader.window,
+                        event.property,
+                        Atom::from(AtomEnum::ANY),
+                        buff.len() as u32,
+                        ::std::u32::MAX, // FIXME reasonable buffer size
+                    )
+                    .map_err(Into::into)
+                    .and_then(|cookie| cookie.reply())?;
+
+                    if reply.type_ == self.reader.atoms.incr {
+                        if let Some(&size) = reply.value.get(0) {
+                            buff.reserve(size as usize);
+                        }
+
+                        let _ = xproto::delete_property(
+                            &self.reader.connection,
+                            self.reader.window,
+                            property,
+                        );
+
+                        let _ = self.reader.connection.flush();
+                        is_incr = true;
+
+                        continue;
+                    } else if reply.type_ != target {
+                        return Err(Error::UnexpectedType(reply.type_));
+                    }
+
+                    buff.extend_from_slice(&reply.value);
+                    break;
+                }
+                Event::PropertyNotify(event) if is_incr => {
+                    if event.state != xproto::Property::NEW_VALUE {
+                        continue;
+                    };
+
+                    let length = xproto::get_property(
+                        &self.reader.connection,
+                        false,
+                        self.reader.window,
+                        property,
+                        Atom::from(AtomEnum::ANY),
+                        0,
+                        0,
+                    )
+                    .map_err(Into::into)
+                    .and_then(|cookie| cookie.reply())?
+                    .bytes_after;
+
+                    let reply = xproto::get_property(
+                        &self.reader.connection,
+                        true,
+                        self.reader.window,
+                        property,
+                        Atom::from(AtomEnum::ANY),
+                        0,
+                        length,
+                    )
+                    .map_err(Into::into)
+                    .and_then(|cookie| cookie.reply())?;
+
+                    if reply.type_ != target {
+                        continue;
+                    };
+
+                    if reply.value_len != 0 {
+                        buff.extend_from_slice(&reply.value);
+                    } else {
+                        break;
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        Ok(())
+    }
+}
+
+pub struct Context {
+    pub connection: Connection,
+    pub screen: usize,
+    pub window: Window,
+    pub atoms: Atoms,
+}
 
 #[derive(Clone, Debug)]
 pub struct Atoms {
@@ -19,18 +271,6 @@ pub struct Atoms {
     pub string: Atom,
     pub utf8_string: Atom,
     pub incr: Atom,
-}
-
-/// X11 Clipboard
-pub struct Clipboard {
-    pub getter: Context,
-}
-
-pub struct Context {
-    pub connection: Connection,
-    pub screen: usize,
-    pub window: Window,
-    pub atoms: Atoms,
 }
 
 #[inline]
@@ -95,180 +335,199 @@ impl Context {
     }
 }
 
-impl Clipboard {
-    /// Create Clipboard.
-    pub fn new() -> Result<Self, Error> {
-        let getter = Context::new(None)?;
+pub struct Worker {
+    context: Arc<Context>,
+    selections: Arc<RwLock<HashMap<Atom, (Atom, Vec<u8>)>>>,
+    receiver: mpsc::Receiver<Atom>,
+}
 
-        Ok(Clipboard { getter })
-    }
+struct IncrState {
+    selection: Atom,
+    requestor: Atom,
+    property: Atom,
+    pos: usize,
+}
 
-    fn process_event<T>(
-        &self,
-        buff: &mut Vec<u8>,
-        selection: Atom,
-        target: Atom,
-        property: Atom,
-        timeout: T,
-    ) -> Result<(), Error>
-    where
-        T: Into<Option<Duration>>,
-    {
-        let mut is_incr = false;
-        let timeout = timeout.into();
-        let start_time = if timeout.is_some() {
-            Some(Instant::now())
-        } else {
-            None
-        };
+impl Worker {
+    pub const INCR_CHUNK_SIZE: usize = 4000;
 
-        loop {
-            if timeout
-                .into_iter()
-                .zip(start_time)
-                .next()
-                .map(|(timeout, time)| (Instant::now() - time) >= timeout)
-                .unwrap_or(false)
-            {
-                return Err(Error::Timeout);
-            }
+    pub fn run(self) {
+        use x11rb::connection::RequestConnection;
 
-            let event = match self.getter.connection.poll_for_event()? {
-                Some(event) => event,
-                None => {
-                    thread::park_timeout(POLL_DURATION);
-                    continue;
+        let mut incr_map = HashMap::new();
+        let mut state_map = HashMap::new();
+
+        let max_length = self.context.connection.maximum_request_bytes() * 4;
+
+        while let Ok(event) = self.context.connection.wait_for_event() {
+            while let Ok(selection) = self.receiver.try_recv() {
+                if let Some(property) = incr_map.remove(&selection) {
+                    state_map.remove(&property);
                 }
-            };
+            }
 
             match event {
-                Event::SelectionNotify(event) => {
-                    if event.selection != selection {
-                        continue;
+                Event::SelectionRequest(event) => {
+                    let selections = match self.selections.read().ok() {
+                        Some(selections) => selections,
+                        None => continue,
                     };
 
-                    // Note that setting the property argument to None indicates that the
-                    // conversion requested could not be made.
-                    if event.property == AtomEnum::NONE.into() {
-                        break;
+                    let &(target, ref value) =
+                        match selections.get(&event.selection) {
+                            Some(key_value) => key_value,
+                            None => continue,
+                        };
+
+                    if event.target == self.context.atoms.targets {
+                        let data: Vec<u8> = {
+                            let atom_target_bytes =
+                                self.context.atoms.targets.to_le_bytes();
+
+                            let target_bytes = target.to_le_bytes();
+
+                            atom_target_bytes
+                                .iter()
+                                .chain(target_bytes.iter())
+                                .copied()
+                                .collect()
+                        };
+
+                        xproto::change_property(
+                            &self.context.connection,
+                            xproto::PropMode::REPLACE,
+                            event.requestor,
+                            event.property,
+                            xproto::AtomEnum::ATOM,
+                            32,
+                            2,
+                            &data,
+                        )
+                        .expect("Change property");
+                    } else if value.len() < max_length - 24 {
+                        let _ = xproto::change_property(
+                            &self.context.connection,
+                            xproto::PropMode::REPLACE,
+                            event.requestor,
+                            event.property,
+                            target,
+                            8,
+                            value.len() as u32,
+                            value,
+                        )
+                        .expect("Change property");
+                    } else {
+                        let _ = xproto::change_window_attributes(
+                            &self.context.connection,
+                            event.requestor,
+                            &xproto::ChangeWindowAttributesAux::new()
+                                .event_mask(xproto::EventMask::PROPERTY_CHANGE),
+                        )
+                        .expect("Change window attributes");
+
+                        xproto::change_property(
+                            &self.context.connection,
+                            xproto::PropMode::REPLACE,
+                            event.requestor,
+                            event.property,
+                            self.context.atoms.incr,
+                            32,
+                            0,
+                            &[],
+                        )
+                        .expect("Change property");
+
+                        incr_map.insert(event.selection, event.property);
+                        state_map.insert(
+                            event.property,
+                            IncrState {
+                                selection: event.selection,
+                                requestor: event.requestor,
+                                property: event.property,
+                                pos: 0,
+                            },
+                        );
                     }
 
-                    let reply = xproto::get_property(
-                        &self.getter.connection,
+                    let _ = xproto::send_event(
+                        &self.context.connection,
                         false,
-                        self.getter.window,
-                        event.property,
-                        Atom::from(AtomEnum::ANY),
-                        buff.len() as u32,
-                        ::std::u32::MAX, // FIXME reasonable buffer size
+                        event.requestor,
+                        0u32,
+                        xproto::SelectionNotifyEvent {
+                            response_type: 31,
+                            sequence: event.sequence,
+                            time: event.time,
+                            requestor: event.requestor,
+                            selection: event.selection,
+                            target: event.target,
+                            property: event.property,
+                        },
                     )
-                    .map_err(Into::into)
-                    .and_then(|cookie| cookie.reply())?;
+                    .expect("Send event");
 
-                    if reply.type_ == self.getter.atoms.incr {
-                        if let Some(&size) = reply.value.get(0) {
-                            buff.reserve(size as usize);
-                        }
+                    let _ = self.context.connection.flush();
+                }
+                Event::PropertyNotify(event) => {
+                    if event.state != xproto::Property::DELETE {
+                        continue;
+                    }
 
-                        let _ = xproto::delete_property(
-                            &self.getter.connection,
-                            self.getter.window,
-                            property,
+                    let is_end = {
+                        let state = match state_map.get_mut(&event.atom) {
+                            Some(state) => state,
+                            None => continue,
+                        };
+
+                        let selections = match self.selections.read().ok() {
+                            Some(selections) => selections,
+                            None => continue,
+                        };
+
+                        let &(target, ref value) =
+                            match selections.get(&state.selection) {
+                                Some(key_value) => key_value,
+                                None => continue,
+                            };
+
+                        let len = std::cmp::min(
+                            Self::INCR_CHUNK_SIZE,
+                            value.len() - state.pos,
                         );
 
-                        let _ = self.getter.connection.flush();
-                        is_incr = true;
+                        let _ = xproto::change_property(
+                            &self.context.connection,
+                            xproto::PropMode::REPLACE,
+                            state.requestor,
+                            state.property,
+                            target,
+                            8,
+                            len as u32,
+                            &value[state.pos..][..len],
+                        )
+                        .expect("Change property");
 
-                        continue;
-                    } else if reply.type_ != target {
-                        return Err(Error::UnexpectedType(reply.type_));
-                    }
-
-                    buff.extend_from_slice(&reply.value);
-                    break;
-                }
-                Event::PropertyNotify(event) if is_incr => {
-                    if event.state != xproto::Property::NEW_VALUE {
-                        continue;
+                        state.pos += len;
+                        len == 0
                     };
 
-                    let length = xproto::get_property(
-                        &self.getter.connection,
-                        false,
-                        self.getter.window,
-                        property,
-                        Atom::from(AtomEnum::ANY),
-                        0,
-                        0,
-                    )
-                    .map_err(Into::into)
-                    .and_then(|cookie| cookie.reply())?
-                    .bytes_after;
+                    if is_end {
+                        state_map.remove(&event.atom);
+                    }
 
-                    let reply = xproto::get_property(
-                        &self.getter.connection,
-                        true,
-                        self.getter.window,
-                        property,
-                        Atom::from(AtomEnum::ANY),
-                        0,
-                        length,
-                    )
-                    .map_err(Into::into)
-                    .and_then(|cookie| cookie.reply())?;
+                    self.context.connection.flush().expect("Flush connection");
+                }
+                Event::SelectionClear(event) => {
+                    if let Some(property) = incr_map.remove(&event.selection) {
+                        state_map.remove(&property);
+                    }
 
-                    if reply.type_ != target {
-                        continue;
-                    };
-
-                    if reply.value_len != 0 {
-                        buff.extend_from_slice(&reply.value);
-                    } else {
-                        break;
+                    if let Ok(mut write_setmap) = self.selections.write() {
+                        write_setmap.remove(&event.selection);
                     }
                 }
-                _ => {}
+                _ => (),
             }
         }
-
-        Ok(())
-    }
-
-    /// load value.
-    pub fn load<T>(
-        &self,
-        selection: Atom,
-        target: Atom,
-        property: Atom,
-        timeout: T,
-    ) -> Result<Vec<u8>, Error>
-    where
-        T: Into<Option<Duration>>,
-    {
-        let mut buff = Vec::new();
-        let timeout = timeout.into();
-
-        let _ = xproto::convert_selection(
-            &self.getter.connection,
-            self.getter.window,
-            selection,
-            target,
-            property,
-            x11rb::CURRENT_TIME, // FIXME ^
-                                 // Clients should not use CurrentTime for the time argument of a ConvertSelection request.
-                                 // Instead, they should use the timestamp of the event that caused the request to be made.
-        )?;
-        let _ = self.getter.connection.flush();
-
-        self.process_event(&mut buff, selection, target, property, timeout)?;
-
-        let _ = xproto::delete_property(
-            &self.getter.connection,
-            self.getter.window,
-            property,
-        )?;
-        let _ = self.getter.connection.flush()?;
-
-        Ok(buff)
     }
 }

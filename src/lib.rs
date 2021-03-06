@@ -43,12 +43,16 @@ impl Clipboard {
     }
 
     pub fn read(&self) -> Result<String, Box<dyn Error>> {
-        // TODO: Think about use of `RefCell`
-        // Maybe we should make `read` mutable (?)
         self.raw.read()
+    }
+
+    pub fn write(&mut self, contents: String) -> Result<(), Box<dyn Error>> {
+        self.raw.write(contents)
     }
 }
 
 pub trait ClipboardProvider {
     fn read(&self) -> Result<String, Box<dyn Error>>;
+
+    fn write(&mut self, contents: String) -> Result<(), Box<dyn Error>>;
 }
