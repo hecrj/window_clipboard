@@ -3,7 +3,7 @@ use crate::ClipboardProvider;
 use raw_window_handle::HasRawWindowHandle;
 use std::error::Error;
 
-pub fn new_clipboard<W: HasRawWindowHandle>(
+pub fn connect<W: HasRawWindowHandle>(
     _window: &W,
 ) -> Result<Box<dyn ClipboardProvider>, Box<dyn Error>> {
     Ok(Box::new(clipboard_macos::Clipboard::new()?))

@@ -13,7 +13,8 @@ fn main() {
         .build(&event_loop)
         .unwrap();
 
-    let mut clipboard = Clipboard::new(&window).expect("Create clipboard");
+    let mut clipboard =
+        Clipboard::connect(&window).expect("Connect to clipboard");
 
     clipboard
         .write(String::from("Hello, world!"))

@@ -21,7 +21,7 @@ pub struct Clipboard {
 }
 
 impl Clipboard {
-    pub unsafe fn new(display: *mut c_void) -> Clipboard {
+    pub unsafe fn connect(display: *mut c_void) -> Clipboard {
         let context = Arc::new(Mutex::new(smithay_clipboard::Clipboard::new(
             display as *mut _,
         )));

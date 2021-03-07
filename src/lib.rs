@@ -34,10 +34,10 @@ pub struct Clipboard {
 }
 
 impl Clipboard {
-    pub fn new<W: HasRawWindowHandle>(
+    pub fn connect<W: HasRawWindowHandle>(
         window: &W,
     ) -> Result<Self, Box<dyn Error>> {
-        let raw = platform::new_clipboard(window)?;
+        let raw = platform::connect(window)?;
 
         Ok(Clipboard { raw })
     }

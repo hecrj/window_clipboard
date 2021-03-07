@@ -6,7 +6,7 @@ use std::error::Error;
 pub use clipboard_wayland as wayland;
 pub use clipboard_x11 as x11;
 
-pub fn new_clipboard<W: HasRawWindowHandle>(
+pub fn connect<W: HasRawWindowHandle>(
     window: &W,
 ) -> Result<Box<dyn ClipboardProvider>, Box<dyn Error>> {
     let clipboard = match window.raw_window_handle() {
@@ -14,10 +14,10 @@ pub fn new_clipboard<W: HasRawWindowHandle>(
             assert!(!handle.display.is_null());
 
             Box::new(unsafe {
-                wayland::Clipboard::new(handle.display as *mut _)
+                wayland::Clipboard::connect(handle.display as *mut _)
             }) as _
         }
-        _ => Box::new(x11::Clipboard::new()?) as _,
+        _ => Box::new(x11::Clipboard::connect()?) as _,
     };
 
     Ok(clipboard)
