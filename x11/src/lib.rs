@@ -22,7 +22,7 @@ const POLL_DURATION: std::time::Duration = Duration::from_micros(50);
 pub struct Clipboard {
     reader: Context,
     writer: Arc<Context>,
-    selections: Arc<RwLock<HashMap<Atom, (Atom, Vec<u8>)>>>,
+    selections: Arc<RwLock<HashMap<Atom, (Atom, Vec<u32>)>>>,
     worker: mpsc::Sender<Atom>,
 }
 
@@ -71,7 +71,7 @@ impl Clipboard {
         self.selections
             .write()
             .map_err(|_| Error::SelectionLocked)?
-            .insert(selection, (target, contents.into()));
+            .insert(selection, (target, contents.chars().map(u32::from).collect()));
 
         let _ = xproto::set_selection_owner(
             &self.writer.connection,
@@ -343,7 +343,7 @@ impl Context {
 
 pub struct Worker {
     context: Arc<Context>,
-    selections: Arc<RwLock<HashMap<Atom, (Atom, Vec<u8>)>>>,
+    selections: Arc<RwLock<HashMap<Atom, (Atom, Vec<u32>)>>>,
     receiver: mpsc::Receiver<Atom>,
 }
 
@@ -363,7 +363,7 @@ impl Worker {
         let mut incr_map = HashMap::new();
         let mut state_map = HashMap::new();
 
-        let max_length = self.context.connection.maximum_request_bytes() * 4;
+        let max_length = self.context.connection.maximum_request_bytes();
 
         while let Ok(event) = self.context.connection.wait_for_event() {
             while let Ok(selection) = self.receiver.try_recv() {
@@ -396,8 +396,8 @@ impl Worker {
                             &data,
                         )
                         .expect("Change property");
-                    } else if value.len() < max_length - 24 {
-                        let _ = self.context.connection.change_property8(
+                    } else if value.len() < max_length {
+                        let _ = self.context.connection.change_property32(
                             xproto::PropMode::REPLACE,
                             event.requestor,
                             event.property,
@@ -481,7 +481,7 @@ impl Worker {
                             value.len() - state.pos,
                         );
 
-                        let _ = self.context.connection.change_property8(
+                        let _ = self.context.connection.change_property32(
                             xproto::PropMode::REPLACE,
                             state.requestor,
                             state.property,
