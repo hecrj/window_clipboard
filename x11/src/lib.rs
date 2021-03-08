@@ -8,6 +8,7 @@ use x11rb::errors::ConnectError;
 use x11rb::protocol::xproto::{self, Atom, AtomEnum, Window};
 use x11rb::protocol::Event;
 use x11rb::rust_connection::RustConnection as Connection;
+use x11rb::wrapper::ConnectionExt;
 
 use std::collections::HashMap;
 use std::sync::mpsc;
@@ -385,39 +386,22 @@ impl Worker {
                         };
 
                     if event.target == self.context.atoms.targets {
-                        let data: Vec<u8> = {
-                            let atom_target_bytes =
-                                self.context.atoms.targets.to_le_bytes();
+                        let data = [self.context.atoms.targets, target];
 
-                            let target_bytes = target.to_le_bytes();
-
-                            atom_target_bytes
-                                .iter()
-                                .chain(target_bytes.iter())
-                                .copied()
-                                .collect()
-                        };
-
-                        xproto::change_property(
-                            &self.context.connection,
+                        self.context.connection.change_property32(
                             xproto::PropMode::REPLACE,
                             event.requestor,
                             event.property,
                             xproto::AtomEnum::ATOM,
-                            32,
-                            2,
                             &data,
                         )
                         .expect("Change property");
                     } else if value.len() < max_length - 24 {
-                        let _ = xproto::change_property(
-                            &self.context.connection,
+                        let _ = self.context.connection.change_property8(
                             xproto::PropMode::REPLACE,
                             event.requestor,
                             event.property,
                             target,
-                            8,
-                            value.len() as u32,
                             value,
                         )
                         .expect("Change property");
@@ -430,14 +414,11 @@ impl Worker {
                         )
                         .expect("Change window attributes");
 
-                        xproto::change_property(
-                            &self.context.connection,
+                        self.context.connection.change_property32(
                             xproto::PropMode::REPLACE,
                             event.requestor,
                             event.property,
                             self.context.atoms.incr,
-                            32,
-                            0,
                             &[],
                         )
                         .expect("Change property");
@@ -500,14 +481,11 @@ impl Worker {
                             value.len() - state.pos,
                         );
 
-                        let _ = xproto::change_property(
-                            &self.context.connection,
+                        let _ = self.context.connection.change_property8(
                             xproto::PropMode::REPLACE,
                             state.requestor,
                             state.property,
                             target,
-                            8,
-                            len as u32,
                             &value[state.pos..][..len],
                         )
                         .expect("Change property");
