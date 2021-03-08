@@ -13,7 +13,7 @@ fn main() {
         .build(&event_loop)
         .unwrap();
 
-    let clipboard = Clipboard::new(&window).expect("Create clipboard");
+    let clipboard = Clipboard::connect(&window).expect("Connect to clipboard");
 
     event_loop.run(move |event, _, control_flow| match event {
         Event::MainEventsCleared => {

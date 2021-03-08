@@ -3,7 +3,7 @@ use crate::ClipboardProvider;
 use raw_window_handle::HasRawWindowHandle;
 use std::error::Error;
 
-pub fn new_clipboard<W: HasRawWindowHandle>(
+pub fn connect<W: HasRawWindowHandle>(
     _window: &W,
 ) -> Result<Box<dyn ClipboardProvider>, Box<dyn Error>> {
     Ok(Box::new(Clipboard::new()?))
@@ -34,5 +34,9 @@ impl Error for iOSClipboardError {}
 impl ClipboardProvider for Clipboard {
     fn read(&self) -> Result<String, Box<dyn Error>> {
         Err(Box::new(iOSClipboardError::Unimplemented))
+    }
+
+    fn write(&mut self, contents: String) -> Result<(), Box<dyn Error>> {
+        Err(Box::new(AndroidClipboardError::Unimplemented))
     }
 }

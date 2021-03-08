@@ -34,21 +34,25 @@ pub struct Clipboard {
 }
 
 impl Clipboard {
-    pub fn new<W: HasRawWindowHandle>(
+    pub fn connect<W: HasRawWindowHandle>(
         window: &W,
     ) -> Result<Self, Box<dyn Error>> {
-        let raw = platform::new_clipboard(window)?;
+        let raw = platform::connect(window)?;
 
         Ok(Clipboard { raw })
     }
 
     pub fn read(&self) -> Result<String, Box<dyn Error>> {
-        // TODO: Think about use of `RefCell`
-        // Maybe we should make `read` mutable (?)
         self.raw.read()
+    }
+
+    pub fn write(&mut self, contents: String) -> Result<(), Box<dyn Error>> {
+        self.raw.write(contents)
     }
 }
 
 pub trait ClipboardProvider {
     fn read(&self) -> Result<String, Box<dyn Error>>;
+
+    fn write(&mut self, contents: String) -> Result<(), Box<dyn Error>>;
 }
