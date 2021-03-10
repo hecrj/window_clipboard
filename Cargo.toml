@@ -25,6 +25,7 @@ clipboard_x11 = { version = "0.2", path = "./x11" }
 clipboard_wayland = { version = "0.1", path = "./wayland" }
 
 [dev-dependencies]
+rand = "0.8"
 winit = "0.23"
 
 [workspace]

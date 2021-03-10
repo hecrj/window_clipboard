@@ -3,7 +3,7 @@ mod error;
 
 pub use error::Error;
 
-use x11rb::connection::Connection as _;
+use x11rb::connection::{Connection as _, RequestConnection};
 use x11rb::errors::ConnectError;
 use x11rb::protocol::xproto::{self, Atom, AtomEnum, Window};
 use x11rb::protocol::Event;
@@ -11,7 +11,6 @@ use x11rb::rust_connection::RustConnection as Connection;
 use x11rb::wrapper::ConnectionExt;
 
 use std::collections::HashMap;
-use std::sync::mpsc;
 use std::sync::{Arc, RwLock};
 use std::thread;
 use std::time::{Duration, Instant};
@@ -23,7 +22,6 @@ pub struct Clipboard {
     reader: Context,
     writer: Arc<Context>,
     selections: Arc<RwLock<HashMap<Atom, (Atom, Vec<u8>)>>>,
-    worker: mpsc::Sender<Atom>,
 }
 
 impl Clipboard {
@@ -32,12 +30,10 @@ impl Clipboard {
         let reader = Context::new(None)?;
         let writer = Arc::new(Context::new(None)?);
         let selections = Arc::new(RwLock::new(HashMap::new()));
-        let (sender, receiver) = mpsc::channel();
 
         let worker = Worker {
             context: Arc::clone(&writer),
             selections: Arc::clone(&selections),
-            receiver,
         };
 
         thread::spawn(move || worker.run());
@@ -46,7 +42,6 @@ impl Clipboard {
             reader,
             writer,
             selections,
-            worker: sender,
         })
     }
 
@@ -65,8 +60,6 @@ impl Clipboard {
     pub fn write(&mut self, contents: String) -> Result<(), Error> {
         let selection = self.writer.atoms.clipboard;
         let target = self.writer.atoms.utf8_string;
-
-        let _ = self.worker.send(selection)?;
 
         self.selections
             .write()
@@ -344,34 +337,13 @@ impl Context {
 pub struct Worker {
     context: Arc<Context>,
     selections: Arc<RwLock<HashMap<Atom, (Atom, Vec<u8>)>>>,
-    receiver: mpsc::Receiver<Atom>,
-}
-
-struct IncrState {
-    selection: Atom,
-    requestor: Atom,
-    property: Atom,
-    pos: usize,
 }
 
 impl Worker {
     pub const INCR_CHUNK_SIZE: usize = 4000;
 
     pub fn run(self) {
-        use x11rb::connection::RequestConnection;
-
-        let mut incr_map = HashMap::new();
-        let mut state_map = HashMap::new();
-
-        let max_length = self.context.connection.maximum_request_bytes() * 4;
-
         while let Ok(event) = self.context.connection.wait_for_event() {
-            while let Ok(selection) = self.receiver.try_recv() {
-                if let Some(property) = incr_map.remove(&selection) {
-                    state_map.remove(&property);
-                }
-            }
-
             match event {
                 Event::SelectionRequest(event) => {
                     let selections = match self.selections.read().ok() {
@@ -396,7 +368,7 @@ impl Worker {
                             &data,
                         )
                         .expect("Change property");
-                    } else if value.len() < max_length - 24 {
+                    } else {
                         let _ = self.context.connection.change_property8(
                             xproto::PropMode::REPLACE,
                             event.requestor,
@@ -405,34 +377,6 @@ impl Worker {
                             value,
                         )
                         .expect("Change property");
-                    } else {
-                        let _ = xproto::change_window_attributes(
-                            &self.context.connection,
-                            event.requestor,
-                            &xproto::ChangeWindowAttributesAux::new()
-                                .event_mask(xproto::EventMask::PROPERTY_CHANGE),
-                        )
-                        .expect("Change window attributes");
-
-                        self.context.connection.change_property32(
-                            xproto::PropMode::REPLACE,
-                            event.requestor,
-                            event.property,
-                            self.context.atoms.incr,
-                            &[],
-                        )
-                        .expect("Change property");
-
-                        incr_map.insert(event.selection, event.property);
-                        state_map.insert(
-                            event.property,
-                            IncrState {
-                                selection: event.selection,
-                                requestor: event.requestor,
-                                property: event.property,
-                                pos: 0,
-                            },
-                        );
                     }
 
                     let _ = xproto::send_event(
@@ -454,57 +398,7 @@ impl Worker {
 
                     let _ = self.context.connection.flush();
                 }
-                Event::PropertyNotify(event) => {
-                    if event.state != xproto::Property::DELETE {
-                        continue;
-                    }
-
-                    let is_end = {
-                        let state = match state_map.get_mut(&event.atom) {
-                            Some(state) => state,
-                            None => continue,
-                        };
-
-                        let selections = match self.selections.read().ok() {
-                            Some(selections) => selections,
-                            None => continue,
-                        };
-
-                        let &(target, ref value) =
-                            match selections.get(&state.selection) {
-                                Some(key_value) => key_value,
-                                None => continue,
-                            };
-
-                        let len = std::cmp::min(
-                            Self::INCR_CHUNK_SIZE,
-                            value.len() - state.pos,
-                        );
-
-                        let _ = self.context.connection.change_property8(
-                            xproto::PropMode::REPLACE,
-                            state.requestor,
-                            state.property,
-                            target,
-                            &value[state.pos..][..len],
-                        )
-                        .expect("Change property");
-
-                        state.pos += len;
-                        len == 0
-                    };
-
-                    if is_end {
-                        state_map.remove(&event.atom);
-                    }
-
-                    self.context.connection.flush().expect("Flush connection");
-                }
                 Event::SelectionClear(event) => {
-                    if let Some(property) = incr_map.remove(&event.selection) {
-                        state_map.remove(&property);
-                    }
-
                     if let Ok(mut write_setmap) = self.selections.write() {
                         write_setmap.remove(&event.selection);
                     }
