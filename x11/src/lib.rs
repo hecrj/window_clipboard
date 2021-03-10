@@ -3,7 +3,7 @@ mod error;
 
 pub use error::Error;
 
-use x11rb::connection::{Connection as _, RequestConnection};
+use x11rb::connection::Connection as _;
 use x11rb::errors::ConnectError;
 use x11rb::protocol::xproto::{self, Atom, AtomEnum, Window};
 use x11rb::protocol::Event;
