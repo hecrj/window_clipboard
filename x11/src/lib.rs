@@ -360,23 +360,28 @@ impl Worker {
                     if event.target == self.context.atoms.targets {
                         let data = [self.context.atoms.targets, target];
 
-                        self.context.connection.change_property32(
-                            xproto::PropMode::REPLACE,
-                            event.requestor,
-                            event.property,
-                            xproto::AtomEnum::ATOM,
-                            &data,
-                        )
-                        .expect("Change property");
+                        self.context
+                            .connection
+                            .change_property32(
+                                xproto::PropMode::REPLACE,
+                                event.requestor,
+                                event.property,
+                                xproto::AtomEnum::ATOM,
+                                &data,
+                            )
+                            .expect("Change property");
                     } else {
-                        let _ = self.context.connection.change_property8(
-                            xproto::PropMode::REPLACE,
-                            event.requestor,
-                            event.property,
-                            target,
-                            value,
-                        )
-                        .expect("Change property");
+                        let _ = self
+                            .context
+                            .connection
+                            .change_property8(
+                                xproto::PropMode::REPLACE,
+                                event.requestor,
+                                event.property,
+                                target,
+                                value,
+                            )
+                            .expect("Change property");
                     }
 
                     let _ = xproto::send_event(

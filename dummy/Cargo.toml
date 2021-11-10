@@ -1,0 +1,12 @@
+[package]
+name = "clipboard_dummy"
+version = "0.3.1"
+authors = ["Héctor Ramón Jiménez <hector0193@gmail.com>"]
+edition = "2018"
+description = "A library to obtain access to the dummy clipboard"
+license = "MIT"
+repository = "https://github.com/hecrj/window_clipboard"
+documentation = "https://docs.rs/clipboard_x11"
+keywords = ["clipboard", "dummy"]
+
+[dependencies]
