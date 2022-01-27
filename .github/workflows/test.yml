@@ -14,3 +14,7 @@ jobs:
     - uses: actions/checkout@master
     - name: Run tests
       run: cargo test --verbose
+    - name: Add Wasm target
+      run: rustup target add wasm32-unknown-unknown
+    - name: Run tests on Wasm
+      run: cargo build --verbose --target wasm32-unknown-unknown
