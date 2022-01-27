@@ -13,6 +13,7 @@ categories = ["gui"]
 
 [dependencies]
 raw-window-handle = "0.3"
+thiserror = "1.0"
 
 [target.'cfg(windows)'.dependencies]
 clipboard-win = { version = "4.0", features = ["std"] }

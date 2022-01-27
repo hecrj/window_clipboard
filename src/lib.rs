@@ -26,6 +26,24 @@ mod platform;
 #[path = "platform/android.rs"]
 mod platform;
 
+#[cfg(not(any(
+    all(
+        unix,
+        not(any(
+            target_os = "macos",
+            target_os = "ios",
+            target_os = "android",
+            target_os = "emscripten"
+        ))
+    ),
+    target_os = "windows",
+    target_os = "macos",
+    target_os = "ios",
+    target_os = "android"
+)))]
+#[path = "platform/dummy.rs"]
+mod platform;
+
 use raw_window_handle::HasRawWindowHandle;
 use std::error::Error;
 
