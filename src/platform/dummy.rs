@@ -7,19 +7,19 @@ struct Dummy;
 pub fn connect<W: HasRawWindowHandle>(
     _window: &W,
 ) -> Result<Box<dyn ClipboardProvider>, Box<dyn std::error::Error>> {
-    Ok(Dummy)
+    Ok(Box::new(Dummy))
 }
 
 impl ClipboardProvider for Dummy {
     fn read(&self) -> Result<String, Box<dyn std::error::Error>> {
-        Err(Error::Unimplemented)
+        Err(Box::new(Error::Unimplemented))
     }
 
     fn write(
         &mut self,
         contents: String,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        Err(Error::Unimplemented)
+        Err(Box::new(Error::Unimplemented))
     }
 }
 
