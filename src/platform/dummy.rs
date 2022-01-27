@@ -17,7 +17,7 @@ impl ClipboardProvider for Dummy {
 
     fn write(
         &mut self,
-        contents: String,
+        _contents: String,
     ) -> Result<(), Box<dyn std::error::Error>> {
         Err(Box::new(Error::Unimplemented))
     }
