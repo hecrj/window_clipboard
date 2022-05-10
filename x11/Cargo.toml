@@ -1,6 +1,6 @@
 [package]
 name = "clipboard_x11"
-version = "0.3.1"
+version = "0.4.0"
 authors = ["Héctor Ramón Jiménez <hector0193@gmail.com>"]
 edition = "2018"
 description = "A library to obtain access to the X11 clipboard"
