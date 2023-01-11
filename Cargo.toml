@@ -21,7 +21,7 @@ clipboard-win = { version = "4.0", features = ["std"] }
 [target.'cfg(target_os = "macos")'.dependencies]
 clipboard_macos = { version = "0.1", path = "./macos" }
 
-[target.'cfg(all(unix, not(any(target_os="macos", target_os="android", target_os="emscripten", target_os="ios"))))'.dependencies]
+[target.'cfg(all(unix, not(any(target_os="macos", target_os="android", target_os="emscripten", target_os="ios", target_os="redox"))))'.dependencies]
 clipboard_x11 = { version = "0.4", path = "./x11" }
 clipboard_wayland = { version = "0.2", path = "./wayland" }
 

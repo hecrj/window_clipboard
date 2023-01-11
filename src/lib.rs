@@ -4,7 +4,8 @@
         target_os = "macos",
         target_os = "ios",
         target_os = "android",
-        target_os = "emscripten"
+        target_os = "emscripten",
+        target_os = "redox"
     ))
 ))]
 #[path = "platform/linux.rs"]
@@ -33,7 +34,8 @@ mod platform;
             target_os = "macos",
             target_os = "ios",
             target_os = "android",
-            target_os = "emscripten"
+            target_os = "emscripten",
+            target_os = "redox"
         ))
     ),
     target_os = "windows",
