@@ -5,7 +5,7 @@ pub use error::Error;
 
 use x11rb::connection::Connection as _;
 use x11rb::errors::ConnectError;
-use x11rb::protocol::xproto::{self, Atom, AtomEnum, Window};
+use x11rb::protocol::xproto::{self, Atom, AtomEnum, EventMask, Window};
 use x11rb::protocol::Event;
 use x11rb::rust_connection::RustConnection as Connection;
 use x11rb::wrapper::ConnectionExt;
@@ -388,7 +388,7 @@ impl Worker {
                         &self.context.connection,
                         false,
                         event.requestor,
-                        0u32,
+                        EventMask::NO_EVENT,
                         xproto::SelectionNotifyEvent {
                             response_type: 31,
                             sequence: event.sequence,
