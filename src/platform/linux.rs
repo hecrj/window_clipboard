@@ -1,16 +1,16 @@
 use crate::ClipboardProvider;
 
-use raw_window_handle::{HasRawWindowHandle, RawWindowHandle};
+use raw_window_handle::{HasRawDisplayHandle, RawDisplayHandle};
 use std::error::Error;
 
 pub use clipboard_wayland as wayland;
 pub use clipboard_x11 as x11;
 
-pub fn connect<W: HasRawWindowHandle>(
+pub fn connect<W: HasRawDisplayHandle>(
     window: &W,
 ) -> Result<Box<dyn ClipboardProvider>, Box<dyn Error>> {
-    let clipboard = match window.raw_window_handle() {
-        RawWindowHandle::Wayland(handle) => {
+    let clipboard = match window.raw_display_handle() {
+        RawDisplayHandle::Wayland(handle) => {
             assert!(!handle.display.is_null());
 
             Box::new(unsafe {
