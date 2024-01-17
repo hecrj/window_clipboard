@@ -12,7 +12,7 @@ keywords = ["clipboard", "window", "ui", "gui", "raw-window-handle"]
 categories = ["gui"]
 
 [dependencies]
-raw-window-handle = "0.6"
+raw-window-handle = { version = "0.6", features = ["std"] }
 thiserror = "1.0"
 
 [target.'cfg(windows)'.dependencies]

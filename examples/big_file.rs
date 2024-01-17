@@ -24,7 +24,7 @@ fn main() {
         .unwrap();
 
     let mut clipboard =
-        Clipboard::connect(&window).expect("Connect to clipboard");
+        unsafe { Clipboard::connect(&window) }.expect("Connect to clipboard");
 
     clipboard.write(data.clone()).unwrap();
 

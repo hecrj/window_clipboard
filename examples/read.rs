@@ -13,7 +13,8 @@ fn main() {
         .build(&event_loop)
         .unwrap();
 
-    let clipboard = Clipboard::connect(&window).expect("Connect to clipboard");
+    let clipboard =
+        unsafe { Clipboard::connect(&window) }.expect("Connect to clipboard");
 
     event_loop
         .run(move |event, elwt| match event {
