@@ -27,7 +27,7 @@ clipboard_wayland = { version = "0.2", path = "./wayland" }
 
 [dev-dependencies]
 rand = "0.8"
-winit = "0.28"
+winit = { version = "0.29", features = ["rwh_05"] }
 
 [workspace]
 members = [
