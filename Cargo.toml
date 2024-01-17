@@ -16,7 +16,7 @@ raw-window-handle = "0.5"
 thiserror = "1.0"
 
 [target.'cfg(windows)'.dependencies]
-clipboard-win = { version = "4.0", features = ["std"] }
+clipboard-win = { version = "5.0", features = ["std"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 clipboard_macos = { version = "0.1", path = "./macos" }
