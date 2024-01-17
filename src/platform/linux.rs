@@ -10,13 +10,9 @@ pub fn connect<W: HasRawDisplayHandle>(
     window: &W,
 ) -> Result<Box<dyn ClipboardProvider>, Box<dyn Error>> {
     let clipboard = match window.raw_display_handle() {
-        RawDisplayHandle::Wayland(handle) => {
-            assert!(!handle.display.is_null());
-
-            Box::new(unsafe {
-                wayland::Clipboard::connect(handle.display as *mut _)
-            }) as _
-        }
+        Ok(RawDisplayHandle::Wayland(handle)) => Box::new(unsafe {
+            wayland::Clipboard::connect(handle.display.as_ptr())
+        }) as _,
         _ => Box::new(x11::Clipboard::connect()?) as _,
     };
 
