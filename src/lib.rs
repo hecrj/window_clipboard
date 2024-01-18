@@ -72,8 +72,26 @@ impl Clipboard {
     }
 }
 
+impl Clipboard {
+    pub fn read_primary(&self) -> Option<Result<String, Box<dyn Error>>> {
+        self.raw.read_primary()
+    }
+
+    pub fn write_primary(&mut self, contents: String) -> Option<Result<(), Box<dyn Error>>> {
+        self.raw.write_primary(contents)
+    }
+}
+
 pub trait ClipboardProvider {
     fn read(&self) -> Result<String, Box<dyn Error>>;
 
     fn write(&mut self, contents: String) -> Result<(), Box<dyn Error>>;
+
+    fn read_primary(&self) -> Option<Result<String, Box<dyn Error>>> {
+        None
+    }
+
+    fn write_primary(&mut self, _contents: String) -> Option<Result<(), Box<dyn Error>>> {
+        None
+    }
 }

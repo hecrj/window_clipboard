@@ -33,8 +33,18 @@ impl Clipboard {
         Ok(self.context.lock().unwrap().load()?)
     }
 
+    pub fn read_primary(&self) -> Result<String, Box<dyn Error>> {
+        Ok(self.context.lock().unwrap().load_primary()?)
+    }
+
     pub fn write(&mut self, data: String) -> Result<(), Box<dyn Error>> {
         self.context.lock().unwrap().store(data);
+
+        Ok(())
+    }
+
+    pub fn write_primary(&mut self, data: String) -> Result<(), Box<dyn Error>> {
+        self.context.lock().unwrap().store_primary(data);
 
         Ok(())
     }
