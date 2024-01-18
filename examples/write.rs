@@ -1,12 +1,13 @@
 use window_clipboard::Clipboard;
 use winit::{
+    error::EventLoopError,
     event::{Event, WindowEvent},
-    event_loop::{ControlFlow, EventLoop},
+    event_loop::EventLoop,
     window::WindowBuilder,
 };
 
-fn main() {
-    let event_loop = EventLoop::new();
+fn main() -> Result<(), EventLoopError> {
+    let event_loop = EventLoop::new().unwrap();
 
     let window = WindowBuilder::new()
         .with_title("A fantastic window!")
@@ -14,18 +15,17 @@ fn main() {
         .unwrap();
 
     let mut clipboard =
-        Clipboard::connect(&window).expect("Connect to clipboard");
+        unsafe { Clipboard::connect(&window) }.expect("Connect to clipboard");
 
     clipboard
         .write(String::from("Hello, world!"))
         .expect("Write to clipboard");
 
-    event_loop.run(move |event, _, control_flow| match event {
-        Event::MainEventsCleared => {}
+    event_loop.run(move |event, elwt| match event {
         Event::WindowEvent {
             event: WindowEvent::CloseRequested,
             window_id,
-        } if window_id == window.id() => *control_flow = ControlFlow::Exit,
-        _ => *control_flow = ControlFlow::Wait,
-    });
+        } if window_id == window.id() => elwt.exit(),
+        _ => {}
+    })
 }

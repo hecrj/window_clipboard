@@ -12,11 +12,11 @@ keywords = ["clipboard", "window", "ui", "gui", "raw-window-handle"]
 categories = ["gui"]
 
 [dependencies]
-raw-window-handle = "0.5"
+raw-window-handle = { version = "0.6", features = ["std"] }
 thiserror = "1.0"
 
 [target.'cfg(windows)'.dependencies]
-clipboard-win = { version = "4.0", features = ["std"] }
+clipboard-win = { version = "5.0", features = ["std"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 clipboard_macos = { version = "0.1", path = "./macos" }
@@ -27,7 +27,7 @@ clipboard_wayland = { version = "0.2", path = "./wayland" }
 
 [dev-dependencies]
 rand = "0.8"
-winit = "0.28"
+winit = "0.29"
 
 [workspace]
 members = [

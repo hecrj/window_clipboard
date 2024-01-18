@@ -1,9 +1,9 @@
 use crate::ClipboardProvider;
 
-use raw_window_handle::HasRawDisplayHandle;
+use raw_window_handle::HasDisplayHandle;
 use std::error::Error;
 
-pub fn connect<W: HasRawDisplayHandle>(
+pub fn connect<W: HasDisplayHandle>(
     _window: &W,
 ) -> Result<Box<dyn ClipboardProvider>, Box<dyn Error>> {
     Ok(Box::new(clipboard_macos::Clipboard::new()?))
