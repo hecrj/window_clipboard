@@ -38,4 +38,19 @@ impl Clipboard {
 
         Ok(())
     }
+
+    #[cfg(target_family = "unix")]
+    pub fn read_primary(&self) -> Result<String, Box<dyn Error>> {
+        Ok(self.context.lock().unwrap().load_primary()?)
+    }
+
+    #[cfg(target_family = "unix")]
+    pub fn write_primary(
+        &mut self,
+        data: String,
+    ) -> Result<(), Box<dyn Error>> {
+        self.context.lock().unwrap().store_primary(data);
+
+        Ok(())
+    }
 }

@@ -31,6 +31,18 @@ impl ClipboardProvider for wayland::Clipboard {
     fn write(&mut self, contents: String) -> Result<(), Box<dyn Error>> {
         self.write(contents)
     }
+    #[cfg(target_family = "unix")]
+    fn read_primary(&self) -> Result<String, Box<dyn Error>> {
+        self.read_primary()
+    }
+
+    #[cfg(target_family = "unix")]
+    fn write_primary(
+        &mut self,
+        contents: String,
+    ) -> Result<(), Box<dyn Error>> {
+        self.write_primary(contents)
+    }
 }
 
 impl ClipboardProvider for x11::Clipboard {
@@ -40,5 +52,18 @@ impl ClipboardProvider for x11::Clipboard {
 
     fn write(&mut self, contents: String) -> Result<(), Box<dyn Error>> {
         self.write(contents).map_err(Box::from)
+    }
+
+    #[cfg(target_family = "unix")]
+    fn read_primary(&self) -> Result<String, Box<dyn Error>> {
+        self.read_primary().map_err(Box::from)
+    }
+
+    #[cfg(target_family = "unix")]
+    fn write_primary(
+        &mut self,
+        contents: String,
+    ) -> Result<(), Box<dyn Error>> {
+        self.write_primary(contents).map_err(Box::from)
     }
 }

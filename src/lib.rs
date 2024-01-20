@@ -69,10 +69,30 @@ impl Clipboard {
     pub fn write(&mut self, contents: String) -> Result<(), Box<dyn Error>> {
         self.raw.write(contents)
     }
+
+    #[cfg(target_family = "unix")]
+    pub fn read_primary(&self) -> Result<String, Box<dyn Error>> {
+        self.raw.read_primary()
+    }
+
+    #[cfg(target_family = "unix")]
+    pub fn write_primary(
+        &mut self,
+        contents: String,
+    ) -> Result<(), Box<dyn Error>> {
+        self.raw.write_primary(contents)
+    }
 }
 
 pub trait ClipboardProvider {
     fn read(&self) -> Result<String, Box<dyn Error>>;
 
     fn write(&mut self, contents: String) -> Result<(), Box<dyn Error>>;
+
+    #[cfg(target_family = "unix")]
+    fn read_primary(&self) -> Result<String, Box<dyn Error>>;
+
+    #[cfg(target_family = "unix")]
+    fn write_primary(&mut self, contents: String)
+        -> Result<(), Box<dyn Error>>;
 }
