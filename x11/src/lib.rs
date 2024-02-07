@@ -45,10 +45,9 @@ impl Clipboard {
         })
     }
 
-    /// Read the current [`Clipboard`] value.
-    pub fn read(&self) -> Result<String, Error> {
+    fn read_selection(&self, selection: Atom) -> Result<String, Error> {
         Ok(String::from_utf8(self.load(
-            self.reader.atoms.clipboard,
+            selection,
             self.reader.atoms.utf8_string,
             self.reader.atoms.property,
             std::time::Duration::from_secs(3),
@@ -56,9 +55,18 @@ impl Clipboard {
         .map_err(Error::InvalidUtf8)?)
     }
 
-    /// Write a new value to the [`Clipboard`].
-    pub fn write(&mut self, contents: String) -> Result<(), Error> {
-        let selection = self.writer.atoms.clipboard;
+    /// Read the current CLIPBOARD [`Clipboard`] value.
+    pub fn read(&self) -> Result<String, Error> {
+        self.read_selection(self.reader.atoms.clipboard)
+    }
+
+
+    /// Read the current PRIMARY [`Clipboard`] value.
+    pub fn read_primary(&self) -> Result<String, Error> {
+        self.read_selection(self.reader.atoms.primary)
+    }
+
+    fn write_selection(&mut self, selection: Atom, contents: String) -> Result<(), Error> {
         let target = self.writer.atoms.utf8_string;
 
         self.selections
@@ -85,6 +93,18 @@ impl Clipboard {
         } else {
             Err(Error::InvalidOwner)
         }
+    }
+
+    /// Write a new value to the CLIPBOARD [`Clipboard`].
+    pub fn write(&mut self, contents: String) -> Result<(), Error> {
+        let selection = self.writer.atoms.clipboard;
+        self.write_selection(selection, contents)
+    }
+
+    /// Write a new value to the PRIMARY [`Clipboard`].
+    pub fn write_primary(&mut self, contents: String) -> Result<(), Error> {
+        let selection = self.writer.atoms.primary;
+        self.write_selection(selection, contents)
     }
 
     /// load value.

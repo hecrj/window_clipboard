@@ -24,8 +24,16 @@ impl ClipboardProvider for wayland::Clipboard {
         self.read()
     }
 
+    fn read_primary(&self) -> Option<Result<String, Box<dyn Error>>> {
+        Some(self.read_primary())
+    }
+
     fn write(&mut self, contents: String) -> Result<(), Box<dyn Error>> {
         self.write(contents)
+    }
+
+    fn write_primary(&mut self, contents: String) -> Option<Result<(), Box<dyn Error>>> {
+        Some(self.write_primary(contents))
     }
 }
 
@@ -34,7 +42,15 @@ impl ClipboardProvider for x11::Clipboard {
         self.read().map_err(Box::from)
     }
 
+    fn read_primary(&self) -> Option<Result<String, Box<dyn Error>>> {
+        Some(self.read_primary().map_err(Box::from))
+    }
+
     fn write(&mut self, contents: String) -> Result<(), Box<dyn Error>> {
         self.write(contents).map_err(Box::from)
+    }
+
+    fn write_primary(&mut self, contents: String) -> Option<Result<(), Box<dyn Error>>> {
+        Some(self.write_primary(contents).map_err(Box::from))
     }
 }
