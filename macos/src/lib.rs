@@ -11,80 +11,74 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-#[macro_use]
-extern crate objc;
 
-use objc::runtime::{Class, Object};
-use objc_foundation::{INSArray, INSObject, INSString};
-use objc_foundation::{NSArray, NSDictionary, NSObject, NSString};
-use objc_id::{Id, Owned};
+use objc2::rc::Id;
+use objc2::runtime::{AnyClass, AnyObject, ProtocolObject};
+use objc2::{msg_send_id, ClassType};
+use objc2_app_kit::NSPasteboard;
+use objc2_foundation::{NSArray, NSString};
 use std::error::Error;
-use std::mem::transmute;
+use std::panic::{RefUnwindSafe, UnwindSafe};
 
 pub struct Clipboard {
-    pasteboard: Id<Object>,
+    pasteboard: Id<NSPasteboard>,
 }
 
-// required to bring NSPasteboard into the path of the class-resolver
-#[link(name = "AppKit", kind = "framework")]
-extern "C" {}
+unsafe impl Send for Clipboard {}
+unsafe impl Sync for Clipboard {}
+impl UnwindSafe for Clipboard {}
+impl RefUnwindSafe for Clipboard {}
 
 impl Clipboard {
     pub fn new() -> Result<Clipboard, Box<dyn Error>> {
-        let cls =
-            Class::get("NSPasteboard").ok_or("Class::get(\"NSPasteboard\")")?;
-        let pasteboard: *mut Object =
-            unsafe { msg_send![cls, generalPasteboard] };
-        if pasteboard.is_null() {
-            return Err("NSPasteboard#generalPasteboard returned null".into());
-        }
-        let pasteboard: Id<Object> = unsafe { Id::from_ptr(pasteboard) };
-        Ok(Clipboard { pasteboard })
+        // Use `msg_send_id!` instead of `NSPasteboard::generalPasteboard()`
+        // in the off case that it will return NULL (even though it's
+        // documented not to).
+        let pasteboard: Option<Id<NSPasteboard>> =
+            unsafe { msg_send_id![NSPasteboard::class(), generalPasteboard] };
+        let pasteboard =
+            pasteboard.ok_or("NSPasteboard#generalPasteboard returned null")?;
+        Ok(Self { pasteboard })
     }
 
     pub fn read(&self) -> Result<String, Box<dyn Error>> {
-        let string_class: Id<NSObject> = {
-            let cls: Id<Class> = unsafe { Id::from_ptr(class("NSString")) };
-            unsafe { transmute(cls) }
+        // The NSPasteboard API is a bit weird, it requires you to pass
+        // classes as objects, which `objc2_foundation::NSArray` was not really
+        // made for - so we convert the class to an `AnyObject` type instead.
+        //
+        // TODO: Use the NSPasteboard helper APIs (`stringForType`).
+        let string_class = {
+            let cls: *const AnyClass = NSString::class();
+            let cls = cls as *mut AnyObject;
+            unsafe { Id::retain(cls).unwrap() }
         };
-        let classes: Id<NSArray<NSObject, Owned>> =
-            NSArray::from_vec(vec![string_class]);
-        let options: Id<NSDictionary<NSObject, NSObject>> = NSDictionary::new();
-        let string_array: Id<NSArray<NSString>> = unsafe {
-            let obj: *mut NSArray<NSString> = msg_send![self.pasteboard, readObjectsForClasses:&*classes options:&*options];
-            if obj.is_null() {
-                return Err(
-                    "pasteboard#readObjectsForClasses:options: returned null"
-                        .into(),
-                );
-            }
-            Id::from_ptr(obj)
-        };
-        if string_array.count() == 0 {
-            Err("pasteboard#readObjectsForClasses:options: returned empty"
-                .into())
-        } else {
-            Ok(string_array[0].as_str().to_owned())
+        let classes = NSArray::from_vec(vec![string_class]);
+        let string_array = unsafe {
+            self.pasteboard
+                .readObjectsForClasses_options(&classes, None)
         }
+        .ok_or("pasteboard#readObjectsForClasses:options: returned null")?;
+
+        let obj: *const AnyObject = string_array.first().ok_or(
+            "pasteboard#readObjectsForClasses:options: returned empty",
+        )?;
+        // And this part is weird as well, since we now have to convert the object
+        // into an NSString, which we know it to be since that's what we told
+        // `readObjectsForClasses:options:`.
+        let obj: *mut NSString = obj as _;
+        Ok(unsafe { Id::retain(obj) }.unwrap().to_string())
     }
 
     pub fn write(&mut self, data: String) -> Result<(), Box<dyn Error>> {
-        let string_array = NSArray::from_vec(vec![NSString::from_str(&data)]);
-        let _: usize = unsafe { msg_send![self.pasteboard, clearContents] };
-        let success: bool =
-            unsafe { msg_send![self.pasteboard, writeObjects: string_array] };
-        return if success {
+        let string_array = NSArray::from_vec(vec![ProtocolObject::from_id(
+            NSString::from_str(&data),
+        )]);
+        unsafe { self.pasteboard.clearContents() };
+        let success = unsafe { self.pasteboard.writeObjects(&string_array) };
+        if success {
             Ok(())
         } else {
             Err("NSPasteboard#writeObjects: returned false".into())
-        };
+        }
     }
-}
-
-// this is a convenience function that both cocoa-rs and
-//  glutin define, which seems to depend on the fact that
-//  Option::None has the same representation as a null pointer
-#[inline]
-pub fn class(name: &str) -> *mut Class {
-    unsafe { transmute(Class::get(name)) }
 }
