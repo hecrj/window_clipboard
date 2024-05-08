@@ -13,6 +13,10 @@ keywords = ["clipboard", "macos"]
 default-target = "x86_64-apple-darwin"
 
 [dependencies]
-objc = "0.2"
-objc_id = "0.1"
-objc-foundation = "0.1"
+objc2 = "0.5.1"
+objc2-foundation = { version = "0.2.0", features = [
+    "NSArray",
+    "NSString",
+    "NSURL",
+] }
+objc2-app-kit = { version = "0.2.0", features = ["NSPasteboard"] }
