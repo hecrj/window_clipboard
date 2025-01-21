@@ -14,9 +14,13 @@ default-target = "x86_64-apple-darwin"
 
 [dependencies]
 objc2 = "0.5.1"
-objc2-foundation = { version = "0.2.0", features = [
+objc2-foundation = { version = "0.2.0", default-features = false, features = [
+    "std",
     "NSArray",
     "NSString",
     "NSURL",
 ] }
-objc2-app-kit = { version = "0.2.0", features = ["NSPasteboard"] }
+objc2-app-kit = { version = "0.2.0", default-features = false, features = [
+    "std",
+    "NSPasteboard",
+] }
