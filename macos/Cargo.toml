@@ -1,6 +1,6 @@
 [package]
 name = "clipboard_macos"
-version = "0.1.1"
+version = "0.1.2"
 authors = ["Héctor Ramón Jiménez <hector0193@gmail.com>"]
 edition = "2018"
 description = "A library to obtain access to the macOS clipboard"
@@ -13,14 +13,14 @@ keywords = ["clipboard", "macos"]
 default-target = "x86_64-apple-darwin"
 
 [dependencies]
-objc2 = "0.5.1"
-objc2-foundation = { version = "0.2.0", default-features = false, features = [
+objc2 = "0.6"
+objc2-foundation = { version = "0.3", default-features = false, features = [
     "std",
     "NSArray",
     "NSString",
     "NSURL",
 ] }
-objc2-app-kit = { version = "0.2.0", default-features = false, features = [
+objc2-app-kit = { version = "0.3", default-features = false, features = [
     "std",
     "NSPasteboard",
 ] }
