@@ -11,4 +11,4 @@ keywords = ["clipboard", "x11"]
 
 [dependencies]
 x11rb = "0.13"
-thiserror = "1.0"
+thiserror = "2.0"
