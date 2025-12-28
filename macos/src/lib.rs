@@ -12,16 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use objc2::rc::Id;
-use objc2::runtime::{AnyClass, AnyObject, ProtocolObject};
-use objc2::{msg_send_id, ClassType};
-use objc2_app_kit::NSPasteboard;
+use objc2::rc::Retained;
+use objc2::runtime::ProtocolObject;
+use objc2::{msg_send, ClassType};
+use objc2_app_kit::{NSPasteboard, NSPasteboardWriting};
 use objc2_foundation::{NSArray, NSString};
 use std::error::Error;
 use std::panic::{RefUnwindSafe, UnwindSafe};
 
 pub struct Clipboard {
-    pasteboard: Id<NSPasteboard>,
+    pasteboard: Retained<NSPasteboard>,
 }
 
 unsafe impl Send for Clipboard {}
@@ -34,8 +34,8 @@ impl Clipboard {
         // Use `msg_send_id!` instead of `NSPasteboard::generalPasteboard()`
         // in the off case that it will return NULL (even though it's
         // documented not to).
-        let pasteboard: Option<Id<NSPasteboard>> =
-            unsafe { msg_send_id![NSPasteboard::class(), generalPasteboard] };
+        let pasteboard: Option<Retained<NSPasteboard>> =
+            unsafe { msg_send![NSPasteboard::class(), generalPasteboard] };
         let pasteboard =
             pasteboard.ok_or("NSPasteboard#generalPasteboard returned null")?;
         Ok(Self { pasteboard })
@@ -47,34 +47,29 @@ impl Clipboard {
         // made for - so we convert the class to an `AnyObject` type instead.
         //
         // TODO: Use the NSPasteboard helper APIs (`stringForType`).
-        let string_class = {
-            let cls: *const AnyClass = NSString::class();
-            let cls = cls as *mut AnyObject;
-            unsafe { Id::retain(cls).unwrap() }
-        };
-        let classes = NSArray::from_vec(vec![string_class]);
+        let string_class = NSString::class();
+        let classes = NSArray::arrayWithObject(string_class);
         let string_array = unsafe {
             self.pasteboard
                 .readObjectsForClasses_options(&classes, None)
         }
         .ok_or("pasteboard#readObjectsForClasses:options: returned null")?;
 
-        let obj: *const AnyObject = string_array.first().ok_or(
+        let obj = string_array.firstObject().ok_or(
             "pasteboard#readObjectsForClasses:options: returned empty",
         )?;
-        // And this part is weird as well, since we now have to convert the object
-        // into an NSString, which we know it to be since that's what we told
-        // `readObjectsForClasses:options:`.
-        let obj: *mut NSString = obj as _;
-        Ok(unsafe { Id::retain(obj) }.unwrap().to_string())
+        // `readObjectsForClasses:options:` returns instances of the classes we pass in.
+        // Since we requested `NSString::class()`, this object is guaranteed to be an `NSString`.
+        let obj: Retained<NSString> = unsafe { Retained::cast_unchecked(obj) };
+        Ok(obj.to_string())
     }
 
     pub fn write(&mut self, data: String) -> Result<(), Box<dyn Error>> {
-        let string_array = NSArray::from_vec(vec![ProtocolObject::from_id(
-            NSString::from_str(&data),
-        )]);
-        unsafe { self.pasteboard.clearContents() };
-        let success = unsafe { self.pasteboard.writeObjects(&string_array) };
+        let obj: Retained<ProtocolObject<dyn NSPasteboardWriting>> =
+            ProtocolObject::from_retained(NSString::from_str(&data));
+        let string_array = NSArray::arrayWithObject(&*obj);
+        self.pasteboard.clearContents();
+        let success = self.pasteboard.writeObjects(&string_array);
         if success {
             Ok(())
         } else {
